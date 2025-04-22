@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
-import debounce from 'lodash.debounce';
+import debounce from 'lodash.debounce'; // Keep debounce
 import {
   Container,
   Grid,
@@ -47,75 +47,70 @@ function App() {
     parkingSupplyString: DEFAULT_PARKING_SUPPLY_STRING,
     parkingCost: DEFAULT_PARKING_COST,
   });
+  // NOTE: lastUserChange state is removed
 
-  // State to track the specific mode/value last changed by user commit action
-  const [lastUserChange, setLastUserChange] = useState({ mode: null, value: null });
-
-  // State for data received from the API
   const [apiResponseData, setApiResponseData] = useState(null);
-  // State for loading indicator
   const [isLoading, setIsLoading] = useState(true); // Start true for initial load
-  // State for displaying errors
   const [error, setError] = useState(null);
-  // Ref to prevent initial fetch useEffect from running twice in StrictMode
   const initialFetchDone = useRef(false);
 
 
-  // Debounced function to fetch data from API via backend
+  // --- fetchData function - Debounced, called directly by handlers ---
   const fetchData = useCallback(debounce(async (
-      currentInputState,
-      changedModeKey,
-      changedModeValue
+      stateForCalc, // The state representing the inputs for this calculation
+      changedModeKey = null,
+      changedModeValue = null
       ) => {
-    // === DEBUG LOG: Inside fetchData ===
-    console.log(`*** fetchData CALLED (debounced) ***`, {
-         mode: changedModeKey,
-         value: changedModeValue,
-         currentDriveState: currentInputState.modeShares.Drive // Log Drive state as fetchData sees it
-    }
-    , 500 );
-    // =====================================
+    // Prevent concurrent fetches check (optional but good practice with direct calls)
+    // We might need a separate isLoading ref if setIsLoading causes issues here
+    // For now, assume setIsLoading is sufficient guard.
 
     setIsLoading(true);
+    // Don't clear error here, handlers clear it optimistically
 
-    const modeSharesPayload = currentInputState.modeShares;
-    const populationPayload = parseNumericString(currentInputState.populationString);
-    const supplyPayload = parseNumericString(currentInputState.parkingSupplyString);
-    const costPayload = Number(currentInputState.parkingCost);
+    // Extract and PARSE numeric values just before sending
+    const modeSharesPayload = stateForCalc.modeShares; // Backend handles potential strings
+    const populationPayload = parseNumericString(stateForCalc.populationString);
+    const supplyPayload = parseNumericString(stateForCalc.parkingSupplyString);
+    const costPayload = Number(stateForCalc.parkingCost);
 
-    // Validation
+    // --- Validation ---
     let preFetchError = null;
     if (populationPayload.length === 0) preFetchError = "Population data is required.";
     else if (supplyPayload.length === 0) preFetchError = "Parking Supply data is required.";
     else if (isNaN(costPayload) || costPayload < 0) preFetchError = "Invalid Parking Cost.";
-    else if (populationPayload.length !== supplyPayload.length) preFetchError = `Input Count Mismatch: Pop ${populationPayload.length}, Supply ${supplyPayload.length}.`;
+    else if (populationPayload.length > 0 && supplyPayload.length > 0 && populationPayload.length !== supplyPayload.length) {
+         preFetchError = `Input Count Mismatch: Pop ${populationPayload.length}, Supply ${supplyPayload.length}.`;
+    }
 
     if (preFetchError) {
         console.warn(`fetchData validation failed: ${preFetchError}`);
-        setError(preFetchError);
-        setIsLoading(false);
-        return;
+        setError(preFetchError); // Show validation error
+        setIsLoading(false); // MUST stop loading
+        return; // Stop
     }
+    // If validation passed, clear any previous errors before making call
+    setError(null);
+    // --- End Validation ---
 
     const payload = {
       mode_shares_input: modeSharesPayload,
       population_per_year: populationPayload,
       parking_supply_per_year: supplyPayload,
       parking_cost_per_space: costPayload,
+      // Pass the change info provided by the handler
       changed_mode_key: changedModeKey,
       new_value_percent: changedModeValue
     };
 
-     // console.log("Sending payload:", payload); // Keep commented out
+    // console.log("Sending payload:", payload);
 
     try {
       const response = await axios.post(`${API_BASE_URL}/api/calculate`, payload);
-      // console.log("API Response Raw Data:", response.data); // Keep commented out
-
       setApiResponseData(response.data);
-      setError(null);
+      // setError(null); // Already cleared above
 
-      // Update input state ONLY IF mode shares returned by backend differ
+      // Sync input state with backend result IF necessary
       setInputState(currentState => {
           const backendShares = response.data.processed_mode_shares;
           if (backendShares) {
@@ -129,8 +124,8 @@ function App() {
                    }
                }
                if (changed) {
-                   console.log("+++ Syncing state with backend:", numericBackendShares); // Log sync
-                   return { ...currentState, modeShares: numericBackendShares };
+                  // console.log("Syncing state with backend:", numericBackendShares);
+                  return { ...currentState, modeShares: numericBackendShares };
                 }
           }
           return currentState; // No change needed
@@ -142,125 +137,102 @@ function App() {
       setError(errorMsg);
       setApiResponseData(null);
     } finally {
-      // console.log("--- fetchData FINISHED ---"); // Log completion
-      setIsLoading(false);
+      setIsLoading(false); // Ensure loading always stops
     }
-  }, 500),
-  [API_BASE_URL]
-  );
+  }, 500), // Keep debounce delay
+  [API_BASE_URL] // Dependency for useCallback (only API base URL)
+  ); // End of useCallback
 
 
-  // Effect hook: Runs on mount and when inputState or lastUserChange updates
+  // --- useEffect for INITIAL data fetch ON MOUNT ONLY ---
   useEffect(() => {
-    // === DEBUG LOG: useEffect start ===
-    console.log("--- useEffect RUNNING ---", {
-        inStr: inputState.populationString, // Log a few key state parts
-        inDriveShare: inputState.modeShares.Drive, // Log current Drive share state
-        lastMode: lastUserChange.mode,
-        lastValue: lastUserChange.value
-     });
-     // =================================
-
-    // Handle initial mount fetch separately using ref
-    if (!initialFetchDone.current) {
-      initialFetchDone.current = true;
-      console.log("Initial fetch on mount call...");
-      fetchData(inputState, null, null); // Initial fetch
-      return;
+    // Prevent double fetch in React StrictMode during development
+    if (initialFetchDone.current) {
+        return;
     }
+    initialFetchDone.current = true;
 
-    // For subsequent changes triggered by dependencies:
-    console.log("useEffect triggering fetchData due to dependency change...");
-    fetchData(inputState, lastUserChange.mode, lastUserChange.value);
+    // console.log("Initial fetch on mount...");
+    // Fetch data using the initial state, no specific change info
+    fetchData(inputState, null, null);
 
-    // Cleanup function for the debounce timer
-    return () => {
-        // console.log("useEffect cleanup: cancelling pending fetchData"); // Log cleanup
-        fetchData.cancel();
-    }
-
-  }, [
-      inputState,
-      lastUserChange,
-      fetchData
-     ]);
+    // No cleanup needed as fetchData is stable and called only once here
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // EMPTY dependency array ensures this runs only once on mount
 
 
   // --- Event Handlers ---
+  // Handlers now calculate the next state and call fetchData directly
 
-  // Handler for generic input changes AND mode share typing
+  // Generic input change (Population, Supply, Cost, and MODE TYPING)
   const handleInputChange = (event) => {
     const { name, value } = event.target;
-    // console.log(`handleInputChange: name=${name}, value=${value}`); // Log basic input change
+    let nextState;
+
     if (name.startsWith('modeShares.')) {
+        // Only update state for typing, NO fetch here
         const mode = name.split('.')[1];
-        setInputState(prevState => ({
-            ...prevState, modeShares: { ...prevState.modeShares, [mode]: value }
-        }));
+        nextState = {
+            ...inputState,
+            modeShares: { ...inputState.modeShares, [mode]: value } // Store raw string
+        };
+        setInputState(nextState);
     } else {
-        setInputState(prevState => ({ ...prevState, [name]: value }));
+        // Calculate and set state for Pop/Supply/Cost
+        nextState = { ...inputState, [name]: value };
+        setInputState(nextState); // Update UI immediately
+        // Trigger fetch immediately for these non-mode changes
+        setError(null); // Clear previous errors optimistically
+        fetchData.cancel(); // Cancel any pending debounced calls
+        fetchData(nextState, null, null); // Pass next state, no specific mode change
     }
   };
 
-  // Handler specifically for Mode Share Slider changes
+  // Slider changes
   const handleModeShareChange = (mode, newValue) => {
-    // === DEBUG LOG: Slider Event ===
-    console.log(`>>> SLIDER Event Start: ${mode} to ${newValue}`);
-    // ===============================
     const numericValue = typeof newValue === 'number' ? newValue : 0;
-
-    // Calculate next state directly for logging clarity
+    // Calculate the state as it *will be* after this change
     const nextState = {
         ...inputState,
-        modeShares: {
-           ...inputState.modeShares,
-           [mode]: numericValue
-        }
+        modeShares: { ...inputState.modeShares, [mode]: numericValue }
     };
-    console.log(">>> SLIDER: Setting inputState with Drive:", nextState.modeShares.Drive);
-    setInputState(nextState); // Update state
-
-    console.log(`>>> SLIDER: Setting lastUserChange: mode=${mode}, value=${numericValue}`);
-    setLastUserChange({ mode: mode, value: numericValue }); // Record commit
-    console.log("<<< SLIDER Event Handled");
-    // ===============================
+    // Update state visually immediately
+    setInputState(nextState);
+    // Immediately call fetch with the NEXT state and the change info
+    setError(null);
+    fetchData.cancel();
+    fetchData(nextState, mode, numericValue);
   };
 
-  // Handler specifically for Mode Share numeric input commit (onBlur or Enter)
+  // Mode share text input COMMIT (Blur/Enter)
   const handleModeNumericInputCommit = (mode, commitedValue) => {
-    // === DEBUG LOG: Text Commit Event ===
-    console.log(`>>> TEXT COMMIT Event Start: ${mode} to ${commitedValue}`);
-    // ====================================
-    // Calculate next state
+    // commitedValue is the validated numeric value from ControlsPanel
+    // Calculate the state as it *will be* after this commit
      const nextState = {
         ...inputState,
-        modeShares: {
-            ...inputState.modeShares,
-            [mode]: commitedValue // Store validated number
-        }
+        modeShares: { ...inputState.modeShares, [mode]: commitedValue }
     };
-    console.log(">>> TEXT COMMIT: Setting inputState with Drive:", nextState.modeShares.Drive);
-    setInputState(nextState); // Update state
-
-    console.log(`>>> TEXT COMMIT: Setting lastUserChange: mode=${mode}, value=${commitedValue}`);
-    setLastUserChange({ mode: mode, value: commitedValue }); // Record commit
-    console.log("<<< TEXT COMMIT Event Handled");
-    // ====================================
+    // Update state visually immediately
+    setInputState(nextState);
+    // Immediately call fetch with the NEXT state and the change info
+    setError(null);
+    fetchData.cancel();
+    fetchData(nextState, mode, commitedValue);
   };
 
-  // Handler for Reset button
+  // Reset button
   const handleReset = () => {
     const resetState = {
-      modeShares: { ...BASELINE_MODE_SHARES },
-      populationString: DEFAULT_POPULATION_STRING,
-      parkingSupplyString: DEFAULT_PARKING_SUPPLY_STRING,
-      parkingCost: DEFAULT_PARKING_COST,
+       modeShares: { ...BASELINE_MODE_SHARES },
+       populationString: DEFAULT_POPULATION_STRING,
+       parkingSupplyString: DEFAULT_PARKING_SUPPLY_STRING,
+       parkingCost: DEFAULT_PARKING_COST,
     };
-    console.log(">>> Reset Button: Resetting state TO:", resetState);
-    setInputState(resetState);
+    setInputState(resetState); // Update visually
     setError(null);
-    setLastUserChange({ mode: null, value: null }); // Reset last change
-    console.log("<<< Reset Button Finished.");
+    // Immediately call fetch with the reset state
+    fetchData.cancel();
+    fetchData(resetState, null, null);
   };
 
 
@@ -268,7 +240,7 @@ function App() {
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
       <Typography variant="h4" component="h1" gutterBottom align="center">
-        SEA MOVE Employee Transportation Model MVP
+        SEA MOVES Employee Transportation Model MVP
       </Typography>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -317,12 +289,15 @@ function App() {
         <Grid item xs={12} md={12}>
           <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column' }}>
             <Typography variant="h6" gutterBottom>Inputs</Typography>
+            {/* NOTE: No need to pass onModeNumericInputCommit separately if using this pattern */}
+            {/* ControlsPanel just needs onInputChange and onModeShareChange */}
+            {/* Let's adjust ControlsPanel call slightly */}
             <ControlsPanel
               inputState={inputState}
               modes={MODES}
-              onInputChange={handleInputChange}
-              onModeShareChange={handleModeShareChange}
-              onModeNumericInputCommit={handleModeNumericInputCommit} // Pass handler
+              onInputChange={handleInputChange} // Handles generic AND mode typing
+              onModeShareChange={handleModeShareChange} // Handles slider commit
+              onModeNumericInputCommit={handleModeNumericInputCommit} // Handles text commit
               onReset={handleReset}
               isLoading={isLoading}
             />
@@ -330,8 +305,8 @@ function App() {
         </Grid>
       </Grid>
     </Container>
-  );
-}
+  ); // End return
+} // End App component
 
 // Optional: Define common styles
 const styles = {
