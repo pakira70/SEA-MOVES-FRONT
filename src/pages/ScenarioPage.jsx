@@ -1,6 +1,6 @@
-// src/pages/ScenarioPage.jsx - Revised Rendering Logic for Smoother Updates
+// src/pages/ScenarioPage.jsx - Calculate and Pass Actual Years
 
-import React from 'react';
+import React, { useMemo } from 'react'; // Import useMemo
 import {
   Grid,
   Paper,
@@ -10,138 +10,121 @@ import {
 } from '@mui/material';
 
 // Import Components needed for this page
-import ControlsPanel from '../components/ControlsPanel.jsx'; // Verify path
-import VisualizationsPanel from '../components/VisualizationsPanel.jsx'; // Verify path
-import SummaryTable from '../components/SummaryTable.jsx'; // Verify path
-import FinalCostDisplay from '../components/FinalCostDisplay.jsx'; // Verify path
+import ControlsPanel from '../components/ControlsPanel.jsx';
+import VisualizationsPanel from '../components/VisualizationsPanel.jsx';
+import SummaryTable from '../components/SummaryTable.jsx';
+import FinalCostDisplay from '../components/FinalCostDisplay.jsx';
 
-// Receive props from App.jsx
+// Receive props from App.jsx, including startYear and numYears
 function ScenarioPage({
   inputState,
   apiResponseData,
-  isLoading, // Still needed for overlays and disabling controls
+  isLoading,
   modes,
   onInputChange,
   onModeShareChange,
   onModeNumericInputCommit,
-  onReset
+  onReset,
+  startYear, // Receive startYear
+  numYears   // Receive numYears
 }) {
 
-  // Determine if we have valid data (even if potentially stale during load)
-  const hasApiResponse = apiResponseData !== null;
-  const hasSummaryData = hasApiResponse && apiResponseData.summary_table && apiResponseData.summary_table.length > 0;
-  const hasParkingDataForCost = hasApiResponse && apiResponseData.parking && apiResponseData.years && apiResponseData.years.length > 0;
+  // --- Calculate Actual Years ---
+  // Use useMemo to prevent recalculating on every render unless props change
+  const actualYears = useMemo(() => {
+    if (typeof startYear !== 'number' || typeof numYears !== 'number' || numYears < 1) {
+      // Return default or empty array if props are invalid
+      // Match length of data if possible, otherwise default
+      const dataLength = apiResponseData?.years?.length || 0;
+      return Array.from({ length: dataLength }, (_, i) => `Year ${i + 1}`); // Fallback
+    }
+    // Generate array like [2024, 2025, 2026, ...]
+    return Array.from({ length: numYears }, (_, i) => startYear + i);
+  }, [startYear, numYears, apiResponseData?.years?.length]); // Recompute if these change
 
-  // --- JSX Rendering (Main Layout Grid) ---
+  // --- Determine Data Availability ---
+  const hasApiResponse = apiResponseData !== null;
+  // Use actualYears length for consistency checks if available and valid
+  const expectedDataLength = actualYears.length;
+  const hasSummaryData = hasApiResponse && apiResponseData.summary_table && apiResponseData.summary_table.length === expectedDataLength;
+  const hasParkingDataForCost = hasApiResponse && apiResponseData.parking && apiResponseData.parking.demand_per_year?.length === expectedDataLength;
+
+
+  // --- JSX Rendering (Pass actualYears down) ---
   return (
     <Grid container spacing={3}>
 
       {/* === Top Section: Visualizations / Results === */}
       <Grid item xs={12}>
           <Grid container spacing={3}>
-
                {/* --- Visualizations Panel --- */}
                <Grid item xs={12}>
-                  {/* Add position: relative for the overlay */}
                   <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', minHeight: 380, position: 'relative', overflow: 'hidden' }}>
                     <Typography variant="h6" gutterBottom>Visualizations</Typography>
-
-                    {/* Show initial loading/placeholder ONLY if no data exists yet */}
-                    {!hasApiResponse && isLoading && (
-                       <Box sx={styles.centerBox}><CircularProgress /></Box>
-                    )}
-                    {!hasApiResponse && !isLoading && (
-                       <Box sx={styles.centerBox}><Typography>Run scenario to view visualizations.</Typography></Box>
-                    )}
-
-                    {/* ALWAYS Render the VizPanel if data exists. It will update internally when apiResponseData changes. */}
+                    {!hasApiResponse && isLoading && ( <Box sx={styles.centerBox}><CircularProgress /></Box> )}
+                    {!hasApiResponse && !isLoading && ( <Box sx={styles.centerBox}><Typography>Run scenario to view visualizations.</Typography></Box> )}
                     {hasApiResponse && (
-                       <VisualizationsPanel data={apiResponseData} modes={modes} />
+                       // Pass actualYears to VisualizationsPanel
+                       <VisualizationsPanel
+                           data={apiResponseData}
+                           modes={modes}
+                           actualYears={actualYears} // Pass the calculated years
+                        />
                     )}
-
-                    {/* Subtle Loading Overlay: Shows on top ONLY when loading AND old data exists */}
-                    {isLoading && hasApiResponse && (
-                        <Box sx={styles.loadingOverlay}>
-                            <CircularProgress size={40} thickness={4} />
-                        </Box>
-                    )}
+                    {isLoading && hasApiResponse && ( <Box sx={styles.loadingOverlay}><CircularProgress size={40} thickness={4} /></Box> )}
                   </Paper>
                </Grid>
 
                {/* --- Parking Summary Table --- */}
+               {/* Note: SummaryTable likely uses the 'year' field from the data directly, */}
+               {/* which might need adjustment if backend sends 1,2,3... but we want 2024, 2025... */}
+               {/* Let's assume backend summary_table will be updated or we adjust here later */}
                <Grid item xs={12} md={8}>
                  <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%', position: 'relative', overflow: 'hidden' }}>
                    <Typography variant="h6" gutterBottom>Parking Summary</Typography>
-
-                   {/* Show initial loading/placeholder ONLY if no summary data exists yet */}
-                    {!hasSummaryData && isLoading && (
-                       <Box sx={styles.centerBoxSmall}><CircularProgress size={24} /></Box>
-                    )}
-                   {!hasSummaryData && !isLoading && (
-                     <Typography sx={styles.placeholderText}>No summary data available.</Typography>
-                   )}
-
-                   {/* ALWAYS Render the Table if data exists. It updates when apiResponseData changes. */}
+                   {!hasSummaryData && isLoading && ( <Box sx={styles.centerBoxSmall}><CircularProgress size={24} /></Box> )}
+                   {!hasSummaryData && !isLoading && ( <Typography sx={styles.placeholderText}>No summary data available.</Typography> )}
                    {hasSummaryData && (
+                     // Pass actualYears if SummaryTable needs them for display formatting?
+                     // For now, assume it uses data[i].year
                      <SummaryTable summaryData={apiResponseData.summary_table} />
                    )}
-
-                   {/* Subtle Loading Overlay */}
-                   {isLoading && hasSummaryData && (
-                        <Box sx={styles.loadingOverlay}>
-                            {/* Optionally add a smaller spinner or just rely on dimming */}
-                            {/* <CircularProgress size={24} /> */}
-                        </Box>
-                   )}
+                   {isLoading && hasSummaryData && ( <Box sx={styles.loadingOverlay}></Box> )}
                  </Paper>
                </Grid>
 
                {/* --- Final Cost Display --- */}
                <Grid item xs={12} md={4}>
                  <Paper sx={{ p: 2, height: '100%', position: 'relative', overflow: 'hidden' }}>
-                   {/* Show initial loading/placeholder ONLY if no cost data exists yet */}
-                   {!hasParkingDataForCost && isLoading && (
-                       <Box sx={styles.centerBoxSmall}><CircularProgress size={24} /></Box>
-                   )}
-                   {/* Render default display if no data and not loading */}
-                   {!hasParkingDataForCost && !isLoading && (
-                       <FinalCostDisplay lastYear={null} finalCost={null} />
-                   )}
-
-                   {/* ALWAYS Render the component if data exists. It recalculates/updates when apiResponseData changes. */}
+                   {!hasParkingDataForCost && isLoading && ( <Box sx={styles.centerBoxSmall}><CircularProgress size={24} /></Box> )}
+                   {!hasParkingDataForCost && !isLoading && ( <FinalCostDisplay lastYear={null} finalCost={null} /> )}
                    {hasParkingDataForCost && (
                        (() => {
-                         const yearsArray = apiResponseData.years;
+                         // Use the last year from actualYears for display
+                         const lastActualYear = actualYears[actualYears.length - 1];
                          const shortfallArray = apiResponseData.parking.shortfall_per_year;
                          const costPerSpace = apiResponseData.parking.cost_per_space;
                          let finalCost = null;
-                         let lastYear = null;
-                         if (yearsArray && yearsArray.length > 0 && shortfallArray && shortfallArray.length === yearsArray.length && typeof costPerSpace === 'number') {
-                             lastYear = yearsArray[yearsArray.length - 1];
+
+                         if (shortfallArray && shortfallArray.length === actualYears.length && typeof costPerSpace === 'number') {
                              const lastShortfall = shortfallArray[shortfallArray.length - 1];
                              finalCost = Math.max(0, lastShortfall) * costPerSpace;
                          }
-                         return <FinalCostDisplay lastYear={lastYear} finalCost={finalCost} />;
+                         // Pass the actual last year to the component
+                         return <FinalCostDisplay lastYear={lastActualYear} finalCost={finalCost} />;
                        })()
                    )}
-
-                   {/* Subtle Loading Overlay */}
-                   {isLoading && hasParkingDataForCost && (
-                        <Box sx={styles.loadingOverlay}>
-                           {/* <CircularProgress size={24} /> */}
-                        </Box>
-                   )}
+                   {isLoading && hasParkingDataForCost && ( <Box sx={styles.loadingOverlay}></Box> )}
                  </Paper>
                </Grid>
           </Grid> {/* Closes inner Grid container */}
       </Grid> {/* Closes Top Section Grid item */}
 
-
       {/* === Bottom Section: Interactive Controls === */}
       <Grid item xs={12}>
-        <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column' }}>
+         {/* ... ControlsPanel ... */}
+         <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column' }}>
           <Typography variant="h6" gutterBottom>Interactive Scenario Inputs</Typography>
-          {/* ControlsPanel handles its own disabling via the isLoading prop */}
           <ControlsPanel
             inputState={inputState} modes={modes}
             onInputChange={onInputChange} onModeShareChange={onModeShareChange}
@@ -149,28 +132,33 @@ function ScenarioPage({
             isLoading={isLoading}
           />
         </Paper>
-      </Grid> {/* Closes Bottom Section Grid item */}
-
-    </Grid> // Closes main Grid container for the page
+      </Grid>
+    </Grid> // Closes main Grid container
   ); // End return
 } // End ScenarioPage component
 
-// Define styles locally including the overlay
+// Add prop types for new props
+import PropTypes from 'prop-types';
+ScenarioPage.propTypes = {
+    inputState: PropTypes.object.isRequired,
+    apiResponseData: PropTypes.object, // Can be null initially
+    isLoading: PropTypes.bool.isRequired,
+    modes: PropTypes.arrayOf(PropTypes.string).isRequired,
+    onInputChange: PropTypes.func.isRequired,
+    onModeShareChange: PropTypes.func.isRequired,
+    onModeNumericInputCommit: PropTypes.func.isRequired,
+    onReset: PropTypes.func.isRequired,
+    startYear: PropTypes.number.isRequired, // Added
+    numYears: PropTypes.number.isRequired,  // Added
+};
+
+
+// Define styles locally or import from a shared file
 const styles = {
   centerBox: { display: 'flex', flexGrow: 1, justifyContent: 'center', alignItems: 'center', minHeight: '200px' },
   centerBoxSmall: { display: 'flex', justifyContent: 'center', alignItems: 'center', p: 2, minHeight: '50px'},
   placeholderText: { p: 2, fontStyle: 'italic', color: 'text.secondary', textAlign: 'center' },
-  loadingOverlay: { // Style for the overlay
-    position: 'absolute',
-    inset: 0, // Shortcut for top, right, bottom, left = 0
-    backgroundColor: 'rgba(255, 255, 255, 0.65)', // Semi-transparent white background
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10, // Ensure it's above the chart/table content
-    backdropFilter: 'blur(1px)', // Optional: Add a slight blur effect
-    borderRadius: 'inherit', // Inherit border radius from parent Paper
-  }
+  loadingOverlay: { position: 'absolute', inset: 0, backgroundColor: 'rgba(255, 255, 255, 0.65)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10, backdropFilter: 'blur(1px)', borderRadius: 'inherit' }
 };
 
 export default ScenarioPage;

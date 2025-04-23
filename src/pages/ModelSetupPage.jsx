@@ -1,141 +1,131 @@
-// src/pages/ModelSetupPage.jsx - Updated with Controls
+// src/pages/ModelSetupPage.jsx - CORRECTED baselineSum definition
 
 import React from 'react';
 import {
-    Typography, Paper, Box, Grid, TextField,
-    // Consider adding Slider for baseline mode shares if desired
+    Typography, Paper, Box, Grid, TextField, Divider, Tooltip, IconButton
 } from '@mui/material';
-// Removed Link, navigation is in AppBar now
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import PropTypes from 'prop-types';
 
-// Receive props from App.jsx
+// Receive NEW props from App.jsx
 function ModelSetupPage({
     baselineState,
     modes,
-    onBaselineChange,
-    onBaselineModeShareChange
+    onBaselineNumberChange,
+    onBaselineModeShareChange,
+    onBaselineArrayValueChange, // Keep for future table
+    onBaselineQuickPopChange, // NEW Handler
+    onBaselineQuickSupplyChange // NEW Handler
 }) {
 
-    // Helper to prevent direct modification of prop object
-    const handleInputChange = (event) => {
-        onBaselineChange(event); // Pass event up to App.jsx handler
-    };
-
-    // Handler for baseline mode share text input changes (could add validation/commit logic)
-    const handleModeShareInputChange = (mode, event) => {
-         // Simple pass-through for now, App.jsx handles conversion/clamping
-         onBaselineModeShareChange(mode, event.target.value);
-    };
-
-    // Calculate current sum of baseline shares for display (optional)
+    // Calculate current sum of baseline shares for display (Defined ONCE with const)
     const baselineSum = modes.reduce((sum, mode) => {
         const value = Number(baselineState.baselineModeShares[mode]) || 0;
         return sum + value;
     }, 0);
+    // REMOVED erroneous second assignment to baselineSum
 
+
+    // --- JSX Rendering ---
     return (
-        <Box sx={{ mt: 2 }}> {/* Reduced top margin slightly */}
+        <Box sx={{ mt: 2 }}>
             <Paper sx={{ p: 3 }}>
-                <Typography variant="h5" component="h2" gutterBottom>
-                    Model Setup / Baseline Configuration
-                </Typography>
-                <Typography sx={{ color: 'text.secondary', mb: 3 }}>
-                    Adjust the default values used when resetting the Scenario Tool.
-                </Typography>
+                {/* Header */}
+                <Typography variant="h5" component="h2" gutterBottom> Model Setup / Baseline Configuration </Typography>
+                <Typography sx={{ color: 'text.secondary', mb: 3 }}> Adjust the default assumptions and time frame for the model. Changes here affect the 'Reset to Baseline' action on the Scenario Tool. </Typography>
 
                 <Grid container spacing={3}>
-                    {/* === Baseline Population === */}
-                    <Grid item xs={12}>
-                        <Typography variant="subtitle1" gutterBottom>
-                            Default Population per Year
-                        </Typography>
-                        <TextField
-                            label="Default Population (comma-separated)"
-                            name="defaultPopulationString" // Matches key in baselineState
-                            value={baselineState.defaultPopulationString}
-                            onChange={handleInputChange} // Use generic handler
-                            fullWidth
-                            variant="outlined"
-                            size="small"
-                            sx={{ mb: 2 }}
-                        />
-                    </Grid>
-
-                    {/* === Baseline Parking === */}
-                    <Grid item xs={12} md={8}>
-                        <Typography variant="subtitle1" gutterBottom>
-                            Default Parking Supply per Year
-                        </Typography>
-                        <TextField
-                            label="Default Annual Supply (comma-separated)"
-                            name="defaultParkingSupplyString" // Matches key in baselineState
-                            value={baselineState.defaultParkingSupplyString}
-                            onChange={handleInputChange}
-                            fullWidth
-                            variant="outlined"
-                            size="small"
-                            sx={{ mb: 2 }}
-                        />
+                    {/* Time Frame */}
+                    <Grid item xs={12} md={4}>
+                        <Typography variant="subtitle1" gutterBottom> Simulation Start Year </Typography>
+                        <TextField name="startYear" label="Start Year" type="number" value={baselineState.startYear} onChange={onBaselineNumberChange} inputProps={{ min: 2000, max: 2100, step: "1" }} fullWidth variant="outlined" size="small" sx={{ mb: 2 }} />
                     </Grid>
                     <Grid item xs={12} md={4}>
-                        <Typography variant="subtitle1" gutterBottom>
-                            Default Cost per Space
-                        </Typography>
-                         <TextField
-                            label="Default Cost ($)"
-                            name="defaultParkingCost" // Matches key in baselineState
-                            type="number"
-                            value={baselineState.defaultParkingCost}
-                            onChange={handleInputChange}
-                            inputProps={{ min: 0, step: "1" }}
-                            fullWidth
-                            variant="outlined"
-                            size="small"
-                            sx={{ mb: 2 }}
-                        />
+                         <Typography variant="subtitle1" gutterBottom> Number of Years </Typography>
+                         <TextField name="numYears" label="Years to Project" type="number" value={baselineState.numYears} onChange={onBaselineNumberChange} inputProps={{ min: 1, max: 50, step: "1" }} fullWidth variant="outlined" size="small" sx={{ mb: 2 }} />
                     </Grid>
+                     <Grid item xs={12} md={4}>
+                         <Typography variant="subtitle1" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}> Daily Show Rate (%) <Tooltip title="Percentage of total population assumed to be present on an average day (e.g., commuting to work). Affects daily trips and parking demand calculations."> <IconButton size="small" sx={{ ml: 0.5 }}><InfoOutlinedIcon fontSize="inherit" /></IconButton> </Tooltip> </Typography>
+                         <TextField name="showRate" label="Show Rate (%)" type="number" value={baselineState.showRate} onChange={onBaselineNumberChange} inputProps={{ min: 0, max: 100, step: "1" }} fullWidth variant="outlined" size="small" sx={{ mb: 2 }} />
+                    </Grid>
+                    <Grid item xs={12}><Divider sx={{ my: 1 }} /></Grid>
 
-                     {/* === Baseline Mode Shares === */}
+                    {/* Population (Enable Quick Start) */}
+                    <Grid item xs={12}> <Typography variant="h6" gutterBottom> Default Population Model </Typography> </Grid>
+                    <Grid item xs={12} md={6}>
+                        <Typography variant="subtitle1" gutterBottom> Start Population </Typography>
+                         <TextField
+                            label="Population in Start Year" name="quickStartPopulation" type="number"
+                            value={baselineState.quickStartPopulation} onChange={onBaselineQuickPopChange}
+                            inputProps={{ min: 0, step: "1" }} fullWidth variant="outlined" size="small" sx={{ mb: 2 }}
+                         />
+                    </Grid>
+                     <Grid item xs={12} md={6}>
+                        <Typography variant="subtitle1" gutterBottom> Annual Growth Rate (%) </Typography>
+                         <TextField
+                            label="Avg. Annual Growth (%)" name="quickAnnualGrowthRate" type="number"
+                            value={baselineState.quickAnnualGrowthRate} onChange={onBaselineQuickPopChange}
+                            inputProps={{ min: -100, max: 100, step: "0.1" }} fullWidth variant="outlined" size="small" sx={{ mb: 2 }}
+                         />
+                    </Grid>
+                    {/* Debug display for array */}
+                     <Grid item xs={12}> <Typography variant="caption" sx={{wordBreak: 'break-all'}}>Calculated Pop Array: {JSON.stringify(baselineState.baselinePopulationValues)}</Typography> </Grid>
+                     <Grid item xs={12}><Divider sx={{ my: 1 }} /></Grid>
+
+                    {/* Parking (Enable Quick Start) */}
+                    <Grid item xs={12}> <Typography variant="h6" gutterBottom> Default Parking Model </Typography> </Grid>
+                    <Grid item xs={12} md={6}>
+                        <Typography variant="subtitle1" gutterBottom> Starting Parking Supply </Typography>
+                         <TextField
+                            label="Supply in Start Year (Assumed Constant)" name="quickStartParkingSupply" type="number"
+                            value={baselineState.quickStartParkingSupply} onChange={onBaselineQuickSupplyChange}
+                            inputProps={{ min: 0, step: "1" }} fullWidth variant="outlined" size="small" sx={{ mb: 2 }}
+                         />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                        <Typography variant="subtitle1" gutterBottom> Cost per Space </Typography>
+                        <TextField name="defaultParkingCost" label="Construction Cost ($)" type="number" value={baselineState.defaultParkingCost} onChange={onBaselineNumberChange} inputProps={{ min: 0, step: "1" }} fullWidth variant="outlined" size="small" sx={{ mb: 2 }} />
+                    </Grid>
+                    {/* Debug display for array */}
+                     <Grid item xs={12}> <Typography variant="caption" sx={{wordBreak: 'break-all'}}>Calculated Supply Array: {JSON.stringify(baselineState.baselineParkingSupplyValues)}</Typography> </Grid>
+                     <Grid item xs={12}><Divider sx={{ my: 1 }} /></Grid>
+
+                    {/* Baseline Mode Shares */}
                     <Grid item xs={12}>
-                         <Typography variant="subtitle1" gutterBottom>
-                            Baseline Mode Shares (Sum: {baselineSum.toFixed(1)}%)
+                        <Typography variant="h6" gutterBottom> Baseline Mode Shares </Typography>
+                        <Typography variant="subtitle1" gutterBottom>
+                            (Sum: {baselineSum.toFixed(1)}% | Remaining: {(100 - baselineSum).toFixed(1)}%)
                             {Math.abs(baselineSum - 100) > 0.1 && (
-                                <Typography component="span" color="error" sx={{ml: 1, fontSize: '0.8rem'}}>
-                                    (Warning: Does not sum to 100%)
-                                </Typography>
+                                <Typography component="span" color="error" sx={{ml: 1, fontSize: '0.8rem'}}> Warning: Does not sum to 100% </Typography>
                             )}
                         </Typography>
-                        {/* Maybe add note that these need to sum to 100 */}
                     </Grid>
-
-                    {/* Loop through modes to create inputs */}
                     {modes.map((mode) => (
-                         <Grid item xs={6} sm={4} md={3} key={mode}> {/* Adjust grid sizing */}
-                            <TextField
-                                label={`${mode} (%)`}
-                                name={`baselineModeShares.${mode}`} // Special handling needed or use specific handler
-                                type="number"
-                                value={baselineState.baselineModeShares[mode] ?? ''} // Handle potential undefined
-                                onChange={(e) => handleModeShareInputChange(mode, e)}
-                                // Could add onBlur for validation/normalization trigger
-                                inputProps={{ min: 0, max: 100, step: "0.1" }}
-                                variant="outlined"
-                                size="small"
-                                fullWidth
-                            />
+                         <Grid item xs={6} sm={4} md={3} key={mode}>
+                            <TextField label={`${mode} (%)`} type="number" value={baselineState.baselineModeShares[mode] ?? ''} onChange={(e) => onBaselineModeShareChange(mode, e.target.value)} inputProps={{ min: 0, max: 100, step: "0.1" }} variant="outlined" size="small" fullWidth />
                          </Grid>
                     ))}
-                    {/* Add a button to normalize baseline shares? */}
-                     <Grid item xs={12} sx={{mt: 2, textAlign: 'right'}}>
-                         <Typography variant="caption" color="text.secondary">
-                             Changes are saved automatically. Use 'Reset to Baseline' on the Scenario Tool page to apply them there.
-                         </Typography>
-                         {/* Add save/apply button if auto-save isn't desired */}
-                     </Grid>
-
+                    <Grid item xs={12} sx={{mt: 2, textAlign: 'right'}}> <Typography variant="caption" color="text.secondary"> Changes saved automatically. Use 'Reset to Baseline' on Scenario Tool to apply. </Typography> </Grid>
                 </Grid>
             </Paper>
         </Box>
     );
 }
+
+// PropTypes Definition
+ModelSetupPage.propTypes = {
+    baselineState: PropTypes.shape({
+        startYear: PropTypes.number.isRequired, numYears: PropTypes.number.isRequired, showRate: PropTypes.number.isRequired,
+        quickStartPopulation: PropTypes.number.isRequired, quickAnnualGrowthRate: PropTypes.number.isRequired,
+        quickStartParkingSupply: PropTypes.number.isRequired,
+        baselinePopulationValues: PropTypes.arrayOf(PropTypes.number).isRequired,
+        baselineParkingSupplyValues: PropTypes.arrayOf(PropTypes.number).isRequired,
+        baselineModeShares: PropTypes.object.isRequired, defaultParkingCost: PropTypes.number.isRequired,
+    }).isRequired,
+    modes: PropTypes.arrayOf(PropTypes.string).isRequired,
+    onBaselineNumberChange: PropTypes.func.isRequired, onBaselineModeShareChange: PropTypes.func.isRequired,
+    onBaselineArrayValueChange: PropTypes.func.isRequired,
+    onBaselineQuickPopChange: PropTypes.func.isRequired, onBaselineQuickSupplyChange: PropTypes.func.isRequired,
+};
 
 export default ModelSetupPage;
