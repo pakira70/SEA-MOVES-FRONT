@@ -1,115 +1,109 @@
+// src/components/charts/ModeShareChart.jsx - Added updateMode prop
+
 import React, { useMemo } from 'react';
 import { Doughnut } from 'react-chartjs-2';
+import PropTypes from 'prop-types'; // Import PropTypes
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, Title } from 'chart.js';
-import { MODE_CHART_COLORS } from '../../config'; // Import colors
+// Assuming MODE_CHART_COLORS is correctly imported relative to this file path
+// If config.js is in src/, the path would be ../../config
+// Adjust if your config file is elsewhere
+import { MODE_CHART_COLORS } from '../../config'; // Adjust path if needed
 
 ChartJS.register(ArcElement, Tooltip, Legend, Title);
 
 function ModeShareChart({ modeShares, modes }) {
-  // ============================================
-  // ADD CONSOLE.LOG HERE:
-  console.log("ModeShareChart received props:", { modeShares, modes });
-  // ============================================
+  // console.log("ModeShareChart received props:", { modeShares, modes }); // Keep commented
 
   const chartData = useMemo(() => {
-     if (!modeShares || !modes) return { labels: [], datasets: [] };
+     // Basic validation
+     if (!modeShares || typeof modeShares !== 'object' || !Array.isArray(modes)) {
+         console.warn("ModeShareChart received invalid props:", { modeShares, modes });
+         return { labels: [], datasets: [] };
+     }
 
     const labels = [];
-    const data = [];
+    const dataValues = []; // Use a different name to avoid conflict with 'data' key
     const backgroundColors = [];
 
      modes.forEach((mode, index) => {
-        const share = modeShares[mode] || 0;
-        if(share > 0) { // Only include modes with share > 0 in the chart
+        const share = parseFloat(modeShares[mode]) || 0; // Ensure number
+        // Optional: Only include modes with share > threshold (e.g., 0.1%)?
+        // if(share > 0.1) {
+        if(share > 0) { // Keep including all > 0 for now
            labels.push(mode);
-           data.push(share.toFixed(1));
-           backgroundColors.push(MODE_CHART_COLORS[index % MODE_CHART_COLORS.length]); // Cycle through colors
+           dataValues.push(share.toFixed(1)); // Keep data as string with 1 decimal for display consistency
+           backgroundColors.push(MODE_CHART_COLORS[index % MODE_CHART_COLORS.length]);
         }
      });
-      // Temporary object for logging before formatting
-    const intermediateChartData = {
-      labels: labels,
-      datasets: [
-        {
-          label: 'Mode Share %',
-          data: data, // Log the array of numbers
-          backgroundColor: backgroundColors,
-          borderColor: '#ffffff',
-          borderWidth: 1,
-        },
-      ],
-    };
-
-    // ============================================
-    // ADD CONSOLE.LOG HERE:
-    console.log("ModeShareChart calculated chartData:", intermediateChartData);
-    // ============================================
-
-
-    // Original return still formats data if needed (though perhaps not necessary)
 
     return {
       labels: labels,
       datasets: [
         {
           label: 'Mode Share %',
-          // Chart.js v3/v4 usually handles numbers fine, converting to string here might be unnecessary
-          // Let's try passing numbers directly later if needed
-          data: data,
+          data: dataValues, // Assign the calculated data array
           backgroundColor: backgroundColors,
-          borderColor: '#ffffff', // White border for separation
+          borderColor: '#ffffff',
           borderWidth: 1,
         },
       ],
     };
-  }, [modeShares, modes]);
+  }, [modeShares, modes]); // Dependencies
 
 
   const options = {
     responsive: true,
-    maintainAspectRatio: false, // Important for sizing within container
+    maintainAspectRatio: false,
+    // Optimize animations slightly
+    animation: {
+        duration: 400,
+        // easing: 'linear'
+    },
+    // Disable transitions if needed
+    // transitions: { update: { animation: { duration: 0 } } },
     plugins: {
       legend: {
-        position: 'right', // Position legend
-         labels: {
-            boxWidth: 12, // Smaller legend color boxes
-             padding: 15 // Padding between legend items
-             
-         }
+        position: 'right', labels: { boxWidth: 12, padding: 15 }
       },
-      title: {
-        display: false, // Title is handled outside chart component
-        // text: 'Mode Share Distribution',
-      },
+      title: { display: false },
       tooltip: {
           callbacks: {
              label: function(context) {
                  let label = context.label || '';
-                 if (label) {
-                     label += ': ';
-                 }
-                 if (context.parsed !== null) {
-                     // Ensure the value from the dataset (which might be string) is treated as number for formatting
-                     label += parseFloat(context.parsed).toFixed(1) + '%';
+                 if (label) { label += ': '; }
+                 // context.formattedValue already contains the formatted string (e.g., "71.0")
+                 if (context.formattedValue !== null) {
+                      label += context.formattedValue + '%';
                  }
                  return label;
              }
           }
       }
     },
-    cutout: '50%', // Make it a doughnut chart
+    cutout: '50%',
   };
 
-  // Add a key to force re-render when data structure changes significantly
-  // This helps if modes are added/removed causing labels/datasets to change length
+  // Key based on labels to help with re-renders if needed
   const chartKey = useMemo(() => JSON.stringify(chartData.labels), [chartData.labels]);
 
 
   return (
-       <div style={{ position: 'relative', height: '300px', width: '100%' }}> {/* Adjust height as needed */}
-          <Doughnut data={chartData} options={options} key={chartKey}/>
+       <div style={{ position: 'relative', height: '300px', width: '100%' }}>
+          <Doughnut
+              data={chartData}
+              options={options}
+              key={chartKey}
+              updateMode="active" // <-- ADDED PROP
+           />
        </div>
    );
 }
+
+// --- PropTypes ---
+ModeShareChart.propTypes = {
+    // modeShares might contain strings or numbers initially
+    modeShares: PropTypes.objectOf(PropTypes.oneOfType([PropTypes.string, PropTypes.number])).isRequired,
+    modes: PropTypes.arrayOf(PropTypes.string).isRequired,
+};
 
 export default ModeShareChart;

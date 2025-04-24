@@ -1,7 +1,8 @@
-// src/components/ParkingChart.jsx - Use actual years for labels
+// src/components/charts/ParkingChart.jsx - Added updateMode prop
 
 import React, { useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
+import PropTypes from 'prop-types'; // Import PropTypes
 import {
   Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend,
 } from 'chart.js';
@@ -47,6 +48,25 @@ function ParkingChart({ years, demand, supply }) {
   // --- Chart Options ---
   const options = {
     responsive: true, maintainAspectRatio: false,
+    // Optimize animations slightly - might help reduce flicker perception
+    animation: {
+        duration: 400, // Slightly faster animation
+        // easing: 'linear' // Optional: simpler easing
+    },
+    // Disable animations entirely during updates if needed (uncomment below)
+    // transitions: {
+    //   active: {
+    //     animation: {
+    //       duration: 0 // No animation on hover/active
+    //     }
+    //   },
+      // Can disable specific update transitions if problems persist
+      // update: {
+      //   animation: {
+      //     duration: 0
+      //   }
+      // }
+    // },
     interaction: { mode: 'index', intersect: false },
     plugins: {
       legend: {
@@ -55,20 +75,29 @@ function ParkingChart({ years, demand, supply }) {
       title: { display: false },
       tooltip: {
           callbacks: { // Keep existing tooltip formatting
-             label: function(context) { /* ... */ }
+             label: function(context) {
+                 let label = context.dataset.label || '';
+                 if (label) { label += ': '; }
+                 if (context.parsed.y !== null) {
+                     const value = context.dataset.label === 'Parking Demand'
+                                   ? parseFloat(context.parsed.y).toFixed(1)
+                                   : Math.round(context.parsed.y).toLocaleString();
+                     label += value;
+                 }
+                 return label;
+             }
           }
       },
       datalabels: { display: false }
     },
     scales: {
       x: {
-          display: true, title: { display: true, text: 'Year' } // Simple title
+          display: true, title: { display: true, text: 'Year' }
        },
-      y: { // Single Y Axis
+      y: {
         display: true, position: 'left', title: { display: true, text: 'Number of Spaces' },
         beginAtZero: true,
-        // Adjust suggestedMax based on potentially different data scale
-        suggestedMax: Math.max(100, ...(demand.map(d => parseFloat(d))), ...(supply.map(s => s))) * 1.1, // Ensure minimum max
+        suggestedMax: Math.max(100, ...(demand?.map(d => parseFloat(d)) ?? [0]), ...(supply?.map(s => s) ?? [0])) * 1.1, // Added null checks and default
       },
     },
   };
@@ -79,16 +108,18 @@ function ParkingChart({ years, demand, supply }) {
   return (
      // Ensure container has height (e.g., from VisualizationsPanel or style here)
      <div style={{ position: 'relative', height: '300px', width: '100%' }}>
-        <Bar options={options} data={chartData} key={chartKey} />
+        <Bar
+            options={options}
+            data={chartData}
+            key={chartKey}
+            updateMode="active" // <-- ADDED PROP
+        />
      </div>
   );
 }
 
-
-// Add prop types
-import PropTypes from 'prop-types';
+// --- PropTypes ---
 ParkingChart.propTypes = {
-    // Expect years to be numbers or strings representing years
     years: PropTypes.arrayOf(PropTypes.oneOfType([PropTypes.string, PropTypes.number])).isRequired,
     demand: PropTypes.arrayOf(PropTypes.number).isRequired,
     supply: PropTypes.arrayOf(PropTypes.number).isRequired,
