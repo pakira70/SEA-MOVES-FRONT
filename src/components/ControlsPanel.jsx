@@ -1,150 +1,174 @@
-import React from 'react';
+// src/components/ControlsPanel.jsx - V2.2 + Step 2.3 Modifications (Local State for Text Inputs)
+
+import React, { useState, useEffect, useRef } from 'react'; // Added useState, useEffect, useRef
+import PropTypes from 'prop-types'; // Import PropTypes
 import { Box, Typography, Slider, TextField, Button, Tooltip, IconButton, Grid } from '@mui/material';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 
+// Helper to format number for display (e.g., one decimal place)
+const formatDisplayValue = (value) => {
+    const num = Number(value);
+    if (isNaN(num)) {
+        return ''; // Return empty string if not a valid number
+    }
+    // Format to one decimal place, remove trailing .0 if it exists
+    const formatted = num.toFixed(1);
+    return formatted.endsWith('.0') ? formatted.slice(0, -2) : formatted;
+};
+
+
 function ControlsPanel({
-  inputState, // Main state object from App.jsx
+  inputState, // Main state object from App.jsx (contains numeric modeShares)
   modes,      // Array of mode names
-  onInputChange,            // Handler for generic inputs & temporary mode share typing
-  onModeShareChange,        // Handler for slider changes
-  onModeNumericInputCommit, // Handler for mode share text input commit (Blur/Enter)
+  // onInputChange, // NO LONGER NEEDED for mode shares
+  onModeShareChange,        // Handler for slider changes (passed up)
+  onModeNumericInputCommit, // Handler for mode share text input commit (passed up)
   onReset,                  // Handler for Reset button
-  isLoading                 // Loading state to disable controls
+  isLoading,                // Loading state to disable controls
+  baselineModeShares        // Added in ScenarioPage - Pass down if needed
 }) {
+
+  // --- Local State for Intermediate Text Input Values ---
+  // Stores the string values currently being typed in the TextFields
+  const [intermediateValues, setIntermediateValues] = useState({});
+  // Ref to track which input has focus to prevent overwriting user typing
+  const focusedInputRef = useRef(null);
+
+  // --- Effect to Initialize and Sync Local State with Props ---
+  useEffect(() => {
+    console.log("ControlsPanel Effect: Syncing intermediateValues with inputState.modeShares");
+    const newIntermediate = {};
+    if (inputState && inputState.modeShares) {
+      modes.forEach(mode => {
+        // Initialize with formatted numeric value from inputState
+        newIntermediate[mode] = formatDisplayValue(inputState.modeShares[mode]);
+      });
+    }
+    setIntermediateValues(newIntermediate);
+  }, [inputState?.modeShares, modes]); // Rerun if the numeric shares from App change
+
 
   // Handler for Slider changes - Calls App.jsx's slider handler
   const handleSliderChange = (mode, event, newValue) => {
     if (isLoading) return;
-    // Ensure value passed up is a number
-    const numericValue = typeof newValue === 'number' ? newValue : 0;
+    const numericValue = typeof newValue === 'number' ? Math.max(0, Math.min(100, newValue)) : 0;
+    // Update intermediate value visually immediately
+    setIntermediateValues(prev => ({ ...prev, [mode]: formatDisplayValue(numericValue) }));
+    // Pass the numeric change up to App.jsx
     onModeShareChange(mode, numericValue);
   };
 
-  // Handler for typing in Mode Share input box - Calls App.jsx's generic handler
-  // App.jsx handles updating the state with the raw string via name check
-  const handleModeShareInputChange = (mode, event) => {
+  // Handler for TYPING in Mode Share input box - Updates LOCAL state only
+  const handleModeShareTextChange = (mode, event) => {
       if (isLoading) return;
-      onInputChange({
-          target: {
-              name: `modeShares.${mode}`, // Dot notation identifies the target
-              value: event.target.value  // Pass the raw string value being typed
-          }
-      });
+      const typedValue = event.target.value;
+      // Update only the local intermediate state as the user types
+      setIntermediateValues(prev => ({ ...prev, [mode]: typedValue }));
   };
 
    // Handler for finalizing Mode Share text input (onBlur or Enter)
-   // Validates locally and calls the specific commit handler passed from App.jsx
-  const handleModeShareInputCommit = (mode, event) => {
+   // Validates local intermediate value and calls the specific commit handler from App.jsx
+  const handleModeShareTextCommit = (mode) => {
       if (isLoading) return;
-      let value = parseFloat(event.target.value); // Attempt to parse input
+      focusedInputRef.current = null; // Clear focus ref on commit
+
+      const currentValue = intermediateValues[mode]; // Get value from LOCAL state
+      let value = parseFloat(currentValue); // Attempt to parse local string input
+
       // Validate and clamp the value locally before sending up
       if (isNaN(value)) {
         value = 0; // Default to 0 if invalid input
       }
       value = Math.max(0, Math.min(100, value)); // Clamp between 0 and 100
 
+      // Update local state to the cleaned/formatted value
+      setIntermediateValues(prev => ({ ...prev, [mode]: formatDisplayValue(value) }));
+
       // Call the specific commit handler passed from App.jsx with the validated number
+      // This is the unified point that triggers the proportional calculation in App.jsx
+      console.log(`ControlsPanel: Committing text input for ${mode} with value: ${value}`);
       onModeNumericInputCommit(mode, value);
   };
 
-  // Handler for other text inputs (Population, Supply, Cost) - Calls App.jsx's generic handler
-  const handleGenericTextFieldChange = (event) => {
-      if (isLoading) return;
-      onInputChange(event); // Pass the raw event object to App.jsx's handler
-  };
-
-
   // --- Safely Calculate Sum for Display ---
   let currentModeSum = 0;
-  // Check if inputState and modeShares exist before trying to calculate sum
   if (inputState && inputState.modeShares) {
       currentModeSum = Object.values(inputState.modeShares).reduce((sum, value) => {
-          const num = parseFloat(value); // Attempt conversion inside reduce
-          return sum + (isNaN(num) ? 0 : num); // Add number or 0 if NaN
-      }, 0); // Start sum at 0
+          const num = parseFloat(value);
+          return sum + (isNaN(num) ? 0 : num);
+      }, 0);
   }
   // --- End Sum Calculation ---
 
 
   // --- JSX Rendering ---
   return (
-    // Use Box as the main container, form tag isn't strictly necessary as we handle commits manually
     <Box>
       {/* === MODE SHARE SECTION === */}
       <Typography variant="subtitle1" gutterBottom sx={{ mt: 1, display: 'flex', alignItems: 'center' }}>
-        {/* Display sum safely */}
         Mode Shares ({(typeof currentModeSum === 'number' && !isNaN(currentModeSum)) ? currentModeSum.toFixed(1) : '...'}%)
          <Tooltip title="Adjust percentage via slider or type value in the box (press Enter or click away to apply). Total must be 100%.">
             <IconButton size="small" sx={{ ml: 0.5 }}><InfoOutlinedIcon fontSize="inherit" /></IconButton>
          </Tooltip>
       </Typography>
       <Grid container spacing={2} sx={{ mb: 3 }}>
-          {/* Safety check before mapping modes */}
           {inputState && inputState.modeShares && modes.map((mode) => {
-
-             // --- Safely get values for this mode ---
-             const currentModeStateValue = inputState.modeShares[mode];
-             const isValidValue = currentModeStateValue !== undefined && currentModeStateValue !== null;
-
-             let numericValue = 0; // Default numeric value for slider
-             if (isValidValue) {
-                 const parsed = parseFloat(currentModeStateValue);
-                 if (!isNaN(parsed)) {
-                     numericValue = parsed; // Use parsed float if valid
-                 }
-             }
-             // Clamp numeric value just in case before passing to slider
-             numericValue = Math.max(0, Math.min(100, numericValue));
-
-            // Determine display value for TextField safely
-            const displayValue = isValidValue
-                                  ? (typeof currentModeStateValue === 'number' ? currentModeStateValue.toFixed(1) : String(currentModeStateValue)) // Show number formatted, or string as-is
-                                  : '0'; // Default display string '0'
-             // --- End Safe Value Getting ---
+             // Get the actual numeric value from the main inputState (source of truth)
+             const numericValue = Math.max(0, Math.min(100, Number(inputState.modeShares[mode]) || 0));
+             // Get the potentially different intermediate string value for the text box
+             const displayValue = intermediateValues[mode] ?? ''; // Use local state for display
 
              return (
               <Grid item xs={12} sm={6} md={4} key={mode}>
                   <Box>
                     {/* Label and Input Box */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: -0.5 }}> {/* Reduced gap */}
-                        <Typography component="label" htmlFor={`${mode}-input`} sx={{ fontSize: '0.875rem', flexShrink: 0, minWidth: '70px' }}> {/* Added minWidth */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: -0.5 }}>
+                        <Typography component="label" htmlFor={`${mode}-input`} sx={{ fontSize: '0.875rem', flexShrink: 0, minWidth: '70px' }}>
                           {mode}:
                         </Typography>
                         <TextField
                           id={`${mode}-input`}
-                          value={displayValue} // Use safe display value
-                          onChange={(event) => handleModeShareInputChange(mode, event)}
-                          onBlur={(event) => handleModeShareInputCommit(mode, event)}
+                          // VALUE comes from LOCAL intermediate state
+                          value={displayValue}
+                          // ONCHANGE updates LOCAL intermediate state
+                          onChange={(event) => handleModeShareTextChange(mode, event)}
+                          // ONBLUR commits the LOCAL state via handler from App
+                          onBlur={() => handleModeShareTextCommit(mode)}
+                          onFocus={() => focusedInputRef.current = mode} // Track focus
                           onKeyDown={(event) => {
                             if (event.key === 'Enter') {
-                              handleModeShareInputCommit(mode, event);
-                              event.preventDefault();
+                              handleModeShareTextCommit(mode); // Commit on Enter
+                              event.preventDefault(); // Prevent form submission
+                              event.target.blur(); // Optional: remove focus
+                            } else if (event.key === 'Escape') {
+                               // Optional: Revert intermediate value to actual value on Escape
+                               setIntermediateValues(prev => ({...prev, [mode]: formatDisplayValue(numericValue)}));
+                               event.target.blur();
                             }
                           }}
-                          type="number"
+                          type="text" // Use text to allow intermediate typing like "5."
+                          inputMode="decimal" // Hint for mobile keyboards
                           variant="outlined"
                           size="small"
                           disabled={isLoading}
                           inputProps={{
                             step: "0.1",
-                            style: {
-                                textAlign: 'right',
-                                width: '55px', // Adjusted width
-                                padding: '8px 5px' // Adjusted padding
-                            },
-                            'aria-labelledby': `${mode}-slider-label` // Link for accessibility
+                            style: { textAlign: 'right', width: '55px', padding: '8px 5px' },
+                            'aria-labelledby': `${mode}-slider-label`
                           }}
-                          sx={{ ml: 'auto' }} // Push input to the right
+                          sx={{ ml: 'auto' }}
                         />
-                        <Typography sx={{ fontSize: '0.875rem', ml: 0.5 }}>%</Typography> {/* Added margin */}
+                        <Typography sx={{ fontSize: '0.875rem', ml: 0.5 }}>%</Typography>
                     </Box>
                     {/* Slider */}
                     <Slider
-                        aria-hidden="true" // Hide from accessibility tree as TextField is primary control now
-                        value={numericValue} // Use safe numeric value
+                        aria-labelledby={`${mode}-slider-label`} // Use actual label ID if available
+                        // VALUE is the actual numeric value from inputState props
+                        value={numericValue}
+                        // ONCHANGE updates intermediate text AND calls handler passed up
                         onChange={(event, newValue) => handleSliderChange(mode, event, newValue)}
                         valueLabelDisplay="off"
-                        step={0.1} // Fine step for smooth slider movement linked to text input
+                        step={0.1}
                         min={0}
                         max={100}
                         disabled={isLoading}
@@ -158,71 +182,38 @@ function ControlsPanel({
       {/* === END MODE SHARE SECTION === */}
 
 
-      {/* === POPULATION SECTION === */}
-      <Typography variant="subtitle1" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-        Population per Year
-         <Tooltip title="Enter annual population figures, separated by commas.">
-            <IconButton size="small" sx={{ ml: 0.5 }}><InfoOutlinedIcon fontSize="inherit" /></IconButton>
-         </Tooltip>
-      </Typography>
-      <TextField
-        label="Population (comma-separated)"
-        name="populationString"
-        value={inputState?.populationString || ''} // Use optional chaining and default
-        onChange={handleGenericTextFieldChange} // Use generic handler
-        fullWidth
-        variant="outlined"
-        size="small"
-        disabled={isLoading}
-        sx={{ mb: 3 }}
-      />
-      {/* === END POPULATION SECTION === */}
-
-
-      {/* === PARKING SECTION === */}
-      <Typography variant="subtitle1" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-        Parking Parameters
-         <Tooltip title="Enter annual parking supply (comma-separated, matching population years) and cost per space.">
-            <IconButton size="small" sx={{ ml: 0.5 }}><InfoOutlinedIcon fontSize="inherit" /></IconButton>
-         </Tooltip>
-      </Typography>
-       <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} sm={8}>
-                 <TextField
-                   label="Annual Parking Supply (comma-separated)"
-                   name="parkingSupplyString"
-                   value={inputState?.parkingSupplyString || ''} // Use optional chaining and default
-                   onChange={handleGenericTextFieldChange} // Use generic handler
-                   fullWidth variant="outlined" size="small" disabled={isLoading}
-                 />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-                 <TextField
-                   label="Cost per Space ($)"
-                   name="parkingCost"
-                   type="number"
-                   // Use optional chaining and default '' for potentially null number
-                   value={inputState?.parkingCost === null || inputState?.parkingCost === undefined ? '' : inputState.parkingCost }
-                   onChange={handleGenericTextFieldChange} // Use generic handler
-                   inputProps={{ min: 0, step: "1" }} fullWidth variant="outlined" size="small" disabled={isLoading}
-                 />
-            </Grid>
-       </Grid>
-       {/* === END PARKING SECTION === */}
+      {/* === OTHER INPUTS (Population, Supply, Cost) === */}
+      {/* These sections were removed from V2.2 ControlsPanel as they belong on Setup page */}
+      {/* If they were intended here, they need separate state/handlers */}
 
 
       {/* Reset Button */}
       <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end' }}>
-        <Button
-          variant="outlined"
-          onClick={onReset}
-          disabled={isLoading}
-        >
+        <Button variant="outlined" onClick={onReset} disabled={isLoading}>
           Reset to Baseline
         </Button>
       </Box>
-    </Box> // End main Box container
+    </Box>
   );
 }
+
+// --- Prop Types ---
+ControlsPanel.propTypes = {
+    inputState: PropTypes.object, // Can be null initially
+    modes: PropTypes.arrayOf(PropTypes.string).isRequired,
+    // onInputChange: PropTypes.func, // REMOVED
+    onModeShareChange: PropTypes.func.isRequired,
+    onModeNumericInputCommit: PropTypes.func.isRequired,
+    onReset: PropTypes.func.isRequired,
+    isLoading: PropTypes.bool,
+    baselineModeShares: PropTypes.object // Optional prop
+};
+
+ControlsPanel.defaultProps = {
+    isLoading: false,
+    inputState: { modeShares: {} }, // Provide default structure
+    baselineModeShares: {}
+};
+
 
 export default ControlsPanel;
