@@ -1,4 +1,4 @@
-// src/App.jsx - V2.2 + Step 1 Modifications (Pass props to ScenarioPage)
+// src/App.jsx - COMPLETE CODE with Infinite Loop Fix
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
@@ -20,7 +20,7 @@ import {
   DEFAULT_PARKING_COST as INITIAL_PARKING_COST, MODES
 } from './config';
 
-// Initial Baseline Parameters (Constants) - These define the *defaults* if localStorage is empty/invalid
+// Initial Baseline Parameters (Constants)
 const INITIAL_START_YEAR = 2024;
 const INITIAL_NUM_YEARS = 5;
 const INITIAL_SHOW_RATE = 100;
@@ -32,8 +32,6 @@ const INITIAL_QUICK_START_SUPPLY = 5000;
 const LOCALSTORAGE_KEY = 'seaMovesBaselineConfig';
 
 // --- Helper Functions (Defined ONCE with const, OUTSIDE App component) ---
-// NOTE: These helpers are primarily for the SETUP page and INITIAL baseline calculation
-// They are NOT used for the main scenario API call payload generation.
 const parseNumericString = (str) => { if (!str || typeof str !== 'string') return []; return str.split(',').map(s => s.trim()).filter(s => s !== '').map(Number).filter(n => !isNaN(n)); };
 const parseAndFitArray = (str, targetLength) => { const parsed = str.split(',').map(s => s.trim()).filter(s => s !== '').map(Number).filter(n => !isNaN(n) && n >= 0); if (parsed.length === 0) { console.warn("Helper: Failed to parse array string or string was empty, defaulting to zeros:", str); return Array(Math.max(1, targetLength)).fill(0); } const safeTargetLength = Math.max(1, targetLength); if (parsed.length === safeTargetLength) return parsed; else if (parsed.length > safeTargetLength) return parsed.slice(0, safeTargetLength); else { const lastValue = parsed.length > 0 ? parsed[parsed.length - 1] : 0; const padding = Array(safeTargetLength - parsed.length).fill(lastValue); return [...parsed, ...padding]; } };
 const resizeArray = (originalArray, newLength) => { const currentArray = Array.isArray(originalArray) ? originalArray : []; const currentLength = currentArray.length; if (newLength === currentLength) return currentArray; const safeNewLength = Math.max(1, newLength); if (safeNewLength < currentLength) { return currentArray.slice(0, safeNewLength); } else { const lastValue = currentLength > 0 ? currentArray[currentLength - 1] : 0; const padding = Array(safeNewLength - currentLength).fill(lastValue); return [...currentArray, ...padding]; } };
@@ -41,14 +39,12 @@ const calculatePopulationArray = (startPop, growthRatePercent, numYears) => { co
 const calculateSupplyArray = (startSupply, numYears) => { const years = Math.max(1, numYears); const supply = Math.max(0, startSupply); return Array(years).fill(supply); };
 
 const getInitialBaselineState = () => {
-    console.log("Helper: Calculating initial baselineState...");
+    // console.log("Helper: Calculating initial baselineState..."); // Less noisy log
     let loadedState = null;
     try {
         const storedValue = localStorage.getItem(LOCALSTORAGE_KEY);
         if (storedValue) {
             let tempState = JSON.parse(storedValue);
-            // --- Start Validation of Loaded State ---
-            // Check for essential keys and valid types/values
             if (tempState && typeof tempState === 'object' &&
                 typeof tempState.startYear === 'number' && tempState.startYear >= 1900 && tempState.startYear <= 2100 &&
                 typeof tempState.numYears === 'number' && tempState.numYears >= 1 && tempState.numYears <= 50 &&
@@ -56,45 +52,40 @@ const getInitialBaselineState = () => {
                 typeof tempState.quickStartPopulation === 'number' && tempState.quickStartPopulation >= 0 &&
                 typeof tempState.quickAnnualGrowthRate === 'number' &&
                 typeof tempState.quickStartParkingSupply === 'number' && tempState.quickStartParkingSupply >= 0 &&
-                Array.isArray(tempState.baselinePopulationValues) && // Check if array exists
-                Array.isArray(tempState.baselineParkingSupplyValues) && // Check if array exists
+                Array.isArray(tempState.baselinePopulationValues) &&
+                Array.isArray(tempState.baselineParkingSupplyValues) &&
                 typeof tempState.baselineModeShares === 'object' && tempState.baselineModeShares !== null &&
                 typeof tempState.defaultParkingCost === 'number' && tempState.defaultParkingCost >= 0)
             {
-                 console.log("Helper: Loaded state structure seems valid.");
-                 // Ensure arrays match numYears after loading
+                 // console.log("Helper: Loaded state structure seems valid."); // Less noisy log
                  const expectedLength = tempState.numYears;
                  tempState.baselinePopulationValues = resizeArray(tempState.baselinePopulationValues, expectedLength);
                  tempState.baselineParkingSupplyValues = resizeArray(tempState.baselineParkingSupplyValues, expectedLength);
-                 loadedState = tempState; // Assign validated & potentially resized state
+                 loadedState = tempState;
             } else {
                  console.warn("Helper: Loaded state has invalid structure/missing keys or invalid values, using defaults.");
-                 // loadedState remains null
             }
-            // --- End Validation ---
         }
     } catch (error) { console.error("Helper: Error reading/parsing baseline state from localStorage:", error); }
 
     if (loadedState) {
-        console.log("Helper: Returning loaded baseline state.");
+        // console.log("Helper: Returning loaded baseline state."); // Less noisy log
         return loadedState;
     } else {
         console.log("Helper: Returning initial default baseline state.");
-        // Calculate initial arrays based on default quick start params
         const initialPopArray = calculatePopulationArray(INITIAL_QUICK_START_POP, INITIAL_QUICK_GROWTH_RATE, INITIAL_NUM_YEARS);
         const initialSupplyArray = calculateSupplyArray(INITIAL_QUICK_START_SUPPLY, INITIAL_NUM_YEARS);
         return {
           startYear: INITIAL_START_YEAR, numYears: INITIAL_NUM_YEARS, showRate: INITIAL_SHOW_RATE,
           quickStartPopulation: INITIAL_QUICK_START_POP, quickAnnualGrowthRate: INITIAL_QUICK_GROWTH_RATE,
           quickStartParkingSupply: INITIAL_QUICK_START_SUPPLY,
-          baselinePopulationValues: initialPopArray, // Use calculated defaults
-          baselineParkingSupplyValues: initialSupplyArray, // Use calculated defaults
-          baselineModeShares: { ...INITIAL_BASELINE_SHARES }, // Use configured defaults
-          defaultParkingCost: INITIAL_PARKING_COST, // Use configured default
+          baselinePopulationValues: initialPopArray,
+          baselineParkingSupplyValues: initialSupplyArray,
+          baselineModeShares: { ...INITIAL_BASELINE_SHARES },
+          defaultParkingCost: INITIAL_PARKING_COST,
         };
     }
 };
-
 
 // --- Main Application Component ---
 function App() {
@@ -121,21 +112,33 @@ function App() {
 
 
   // --- State Hooks ---
+  // Baseline configuration state (persisted)
   const [baselineState, setBaselineState] = useState(initialBaseline);
+  // Interactive scenario input state
   const [inputState, setInputState] = useState(initialInputs);
+  // Intermediate text input state for Setup page
   const [intermediateNumberInputs, setIntermediateNumberInputs] = useState(initialIntermediateNumbers);
+  // API response for the interactive scenario
   const [apiResponseData, setApiResponseData] = useState(null);
-  const [isLoading, setIsLoading] = useState(true); // Start true for initial fetch
-  const [error, setError] = useState(null); // For API errors
-  const [lastUserChange, setLastUserChange] = useState({ mode: null, value: null }); // To track specific mode share interaction
-  const initialFetchDone = useRef(false); // To prevent double fetch on mount
+  const [isLoading, setIsLoading] = useState(true); // Loading for interactive scenario
+  const [error, setError] = useState(null); // Error for interactive scenario
+  // API response for the BASELINE scenario
+  const [baselineApiResponseData, setBaselineApiResponseData] = useState(null);
+  const [baselineIsLoading, setBaselineIsLoading] = useState(true); // Loading for baseline scenario
+  const [baselineError, setBaselineError] = useState(null); // Error for baseline scenario
+
+  // Tracking user input for balancing logic
+  const [lastUserChange, setLastUserChange] = useState({ mode: null, value: null });
+  // Refs to prevent double fetch on mount
+  const initialFetchDone = useRef(false);
+  const initialBaselineFetchDone = useRef(false);
 
 
   // --- Persistence Effect ---
   // Saves baselineState to localStorage whenever it changes.
   useEffect(() => {
        try {
-           console.log("Effect: Saving baseline state to localStorage:", baselineState);
+           // console.log("Effect: Saving baseline state to localStorage:", baselineState); // Less noisy log
            localStorage.setItem(LOCALSTORAGE_KEY, JSON.stringify(baselineState));
        } catch (error) {
            console.error("Effect: Error saving baseline state to localStorage:", error);
@@ -143,36 +146,34 @@ function App() {
   }, [baselineState]);
 
 
-  // --- Data Fetching (useCallback with debounce) ---
-  // This fetches the results for the INTERACTIVE scenario based on inputState
+  // --- Data Fetching (INTERACTIVE Scenario - Debounced) ---
   const fetchData = useCallback(debounce(async (
     currentInputState, currentBaselineState, changedModeKey, changedModeValue
     ) => {
-      console.log("fetchData: CALLED WITH", "mode:", changedModeKey, "value:", changedModeValue);
+      console.log("fetchData (Interactive): CALLED WITH", "mode:", changedModeKey, "value:", changedModeValue);
       setIsLoading(true);
-      setError(null); // Clear previous errors
+      setError(null);
 
-      // --- Payload Preparation & Validation ---
+      // Payload Preparation & Validation
       const populationPayload = currentInputState.populationValues;
       const supplyPayload = currentInputState.parkingSupplyValues;
-      const costPayload = Number(currentInputState.parkingCost); // Use interactive cost
-      const showRatePayload = Number(currentBaselineState.showRate); // Use baseline showRate
+      const costPayload = Number(currentInputState.parkingCost);
+      const showRatePayload = Number(currentBaselineState.showRate);
       let preFetchError = null;
 
        if (!Array.isArray(populationPayload) || populationPayload.length === 0) preFetchError = "Population data is missing or invalid.";
        else if (!Array.isArray(supplyPayload) || supplyPayload.length === 0) preFetchError = "Parking Supply data is missing or invalid.";
        else if (populationPayload.length !== supplyPayload.length) preFetchError = `Data length mismatch: Population (${populationPayload.length}) vs Parking Supply (${supplyPayload.length}).`;
        else if (isNaN(costPayload) || costPayload < 0) preFetchError = "Invalid Parking Cost.";
-       else if (isNaN(showRatePayload) || showRatePayload < 0 || showRatePayload > 100) preFetchError = "Invalid Show Rate."; // Changed check to allow 0
-       // Check against numYears from baseline (source of truth for length)
+       else if (isNaN(showRatePayload) || showRatePayload < 0 || showRatePayload > 100) preFetchError = "Invalid Show Rate.";
        else if (populationPayload.length !== currentBaselineState.numYears) preFetchError = `Population data length (${populationPayload.length}) does not match Number of Years (${currentBaselineState.numYears}). Reset scenario?`;
        else if (supplyPayload.length !== currentBaselineState.numYears) preFetchError = `Parking Supply data length (${supplyPayload.length}) does not match Number of Years (${currentBaselineState.numYears}). Reset scenario?`;
 
       if (preFetchError) {
-          console.warn("fetchData: Validation failed:", preFetchError);
+          console.warn("fetchData (Interactive): Validation failed:", preFetchError);
           setError(preFetchError);
           setIsLoading(false);
-          setApiResponseData(null); // Clear data on validation error
+          setApiResponseData(null);
           return;
       }
 
@@ -180,145 +181,236 @@ function App() {
           mode_shares_input: currentInputState.modeShares,
           population_per_year: populationPayload,
           parking_supply_per_year: supplyPayload,
-          parking_cost_per_space: costPayload, // Send interactive cost
-          show_rate_percent: showRatePayload, // Send baseline show rate
+          parking_cost_per_space: costPayload,
+          show_rate_percent: showRatePayload,
           changed_mode_key: changedModeKey, // For backend balancing logic
           new_value_percent: changedModeValue // For backend balancing logic
       };
-      // --- End Payload Preparation ---
 
-
-      // --- API Call ---
+      // API Call
       try {
-        console.log("fetchData: Sending payload:", payload);
+        console.log("fetchData (Interactive): Sending payload:", payload);
         const response = await axios.post(`${API_BASE_URL}/api/calculate`, payload);
-        console.log("fetchData: Received API response:", response.data);
-        setApiResponseData(response.data); // Set the response data
+        console.log("fetchData (Interactive): Received API response:", response.data);
+        setApiResponseData(response.data);
 
-        // --- State Synchronization (Optional but recommended) ---
-        // If backend returns adjusted shares, update frontend input state to match
+        // --- State Synchronization ---
+        // This check compares the CURRENT inputState with the backend response
+        // BEFORE potentially setting state. This helps prevent unnecessary state updates
+        // if the backend simply confirmed the values already present in the frontend.
         setInputState(currentState => {
           const backendShares = response.data?.processed_mode_shares;
           if (backendShares) {
-            let changed = false;
+            let needsUpdate = false;
             const numericBackendShares = {};
-            // Convert backend shares to numbers for comparison
+            // Convert backend shares to numbers and check against current state
             for (const mode in backendShares) {
                 const backendNum = Number(backendShares[mode]);
                 numericBackendShares[mode] = backendNum;
-                // Check if frontend state differs significantly (handle float precision)
+                // Use a tolerance for floating point comparison
                 if (Math.abs(Number(currentState.modeShares[mode]) - backendNum) > 1e-7) {
-                    changed = true;
+                    needsUpdate = true;
                 }
             }
-            if (changed) {
-                console.log("fetchData: Backend shares differ, updating inputState.modeShares");
-                // Return new state object with updated modeShares
+            // Also check if the number of keys differs (e.g., backend added/removed a mode?)
+            if (Object.keys(currentState.modeShares).length !== Object.keys(numericBackendShares).length) {
+                needsUpdate = true;
+            }
+
+            if (needsUpdate) {
+                console.log("fetchData (Interactive): Backend shares differ, synchronizing inputState.modeShares");
+                // Return new state object ONLY if an update is needed
                 return { ...currentState, modeShares: numericBackendShares };
+            } else {
+                 console.log("fetchData (Interactive): Backend shares match frontend, no state update needed.");
             }
           }
-          // If no change needed, return the current state
+          // If no update needed, return the current state reference to avoid re-render trigger
           return currentState;
         });
         // --- End State Synchronization ---
 
       } catch (err) {
-          console.error("fetchData: API Error:", err);
-          // Extract error message from backend response if possible
-          const errorMsg = err.response?.data?.error || err.message || "Failed to fetch data";
+          console.error("fetchData (Interactive): API Error:", err);
+          const errorMsg = err.response?.data?.error || err.message || "Failed to fetch interactive scenario data";
           setError(errorMsg);
-          setApiResponseData(null); // Clear data on API error
+          setApiResponseData(null);
       } finally {
-          setIsLoading(false); // Ensure loading is set to false
+          setIsLoading(false);
       }
-      // --- End API Call ---
-
-  }, 500), [API_BASE_URL]); // Dependency: API_BASE_URL (if it could change)
+  }, 500), [API_BASE_URL]); // Dependency: API_BASE_URL
 
 
-  // --- Effect Hook for API Calls ---
-  // Triggers fetchData when relevant state changes
+  // --- Data Fetching (BASELINE Scenario - NOT Debounced) ---
+  const fetchBaselineData = useCallback(async (currentBaselineState) => {
+    console.log("fetchBaselineData: CALLED");
+    setBaselineIsLoading(true);
+    setBaselineError(null);
+
+    // --- Payload Preparation & Validation ---
+    const populationPayload = currentBaselineState.baselinePopulationValues;
+    const supplyPayload = currentBaselineState.baselineParkingSupplyValues;
+    const costPayload = Number(currentBaselineState.defaultParkingCost);
+    const showRatePayload = Number(currentBaselineState.showRate);
+    const modeSharesPayload = currentBaselineState.baselineModeShares;
+    let preFetchError = null;
+
+    if (!Array.isArray(populationPayload) || populationPayload.length === 0) preFetchError = "Baseline Population data is missing or invalid.";
+    else if (!Array.isArray(supplyPayload) || supplyPayload.length === 0) preFetchError = "Baseline Parking Supply data is missing or invalid.";
+    else if (populationPayload.length !== supplyPayload.length) preFetchError = `Baseline Data length mismatch: Population (${populationPayload.length}) vs Parking Supply (${supplyPayload.length}).`;
+    else if (isNaN(costPayload) || costPayload < 0) preFetchError = "Invalid Baseline Parking Cost.";
+    else if (isNaN(showRatePayload) || showRatePayload < 0 || showRatePayload > 100) preFetchError = "Invalid Baseline Show Rate.";
+    else if (!modeSharesPayload || typeof modeSharesPayload !== 'object') preFetchError = "Invalid Baseline Mode Shares.";
+    else if (populationPayload.length !== currentBaselineState.numYears) preFetchError = `Baseline Population data length (${populationPayload.length}) does not match Number of Years (${currentBaselineState.numYears}).`;
+    else if (supplyPayload.length !== currentBaselineState.numYears) preFetchError = `Baseline Parking Supply data length (${supplyPayload.length}) does not match Number of Years (${currentBaselineState.numYears}).`;
+
+    if (preFetchError) {
+        console.warn("fetchBaselineData: Validation failed:", preFetchError);
+        setBaselineError(preFetchError);
+        setBaselineIsLoading(false);
+        setBaselineApiResponseData(null);
+        return;
+    }
+
+    const payload = {
+        mode_shares_input: modeSharesPayload,
+        population_per_year: populationPayload,
+        parking_supply_per_year: supplyPayload,
+        parking_cost_per_space: costPayload,
+        show_rate_percent: showRatePayload,
+    };
+    // --- End Payload Preparation ---
+
+    // --- API Call ---
+    try {
+      console.log("fetchBaselineData: Sending payload:", payload);
+      const response = await axios.post(`${API_BASE_URL}/api/calculate`, payload);
+      console.log("fetchBaselineData: Received API response:", response.data);
+      setBaselineApiResponseData(response.data);
+
+    } catch (err) {
+        console.error("fetchBaselineData: API Error:", err);
+        const errorMsg = err.response?.data?.error || err.message || "Failed to fetch baseline data";
+        setBaselineError(errorMsg);
+        setBaselineApiResponseData(null);
+    } finally {
+        setBaselineIsLoading(false);
+    }
+    // --- End API Call ---
+
+  }, [API_BASE_URL]); // Dependency: API_BASE_URL
+
+
+  // --- Effect Hook for INTERACTIVE API Calls ---
+  // ***** INFINITE LOOP FIX APPLIED HERE *****
    useEffect(() => {
        // Only run the initial fetch once after mount
        if (!initialFetchDone.current) {
            initialFetchDone.current = true;
-           console.log("Effect: Initial Fetch Triggered");
-           // Use initial state values for the very first fetch
-           fetchData(initialInputs, initialBaseline, null, null);
-           return; // Prevent immediate second fetch due to state updates from first fetch
+           console.log("Effect (Interactive): Initial Fetch Triggered");
+           // Pass the *current* state values for the very first fetch
+           fetchData(inputState, baselineState, null, null);
+           return; // Prevent immediate second fetch
        }
 
-       // Subsequent fetches triggered by changes in dependencies
-       console.log("Effect: RUNNING. lastUserChange:", lastUserChange);
+       // Subsequent fetches triggered by dependencies below
+       console.log("Effect (Interactive): RUNNING. Triggered By:", { lastUserChange, showRate: baselineState.showRate, numYears: baselineState.numYears });
        // Pass current state and the specific user interaction info
        fetchData(inputState, baselineState, lastUserChange.mode, lastUserChange.value);
 
        // Cleanup function for debounce
        return () => {
-           fetchData.cancel(); // Cancel any pending debounced calls if component unmounts or dependencies change quickly
+           fetchData.cancel();
        };
    }, [ // Dependencies that trigger a recalculation of the INTERACTIVE scenario
-       inputState, // Check whole object for simplicity, fine with debounce
-       // Include specific baseline values if they influence the interactive scenario PAYLOAD (like showRate)
-       baselineState.showRate,
-       baselineState.numYears, // Needed for validation checks inside fetchData
-       // lastUserChange is implicitly covered by inputState dependency
-       fetchData // Include the debounced function itself
-       // Removed population/supply/cost from inputState dependencies as they are inside inputState object
+       // --- Trigger based on user input commit ---
+       lastUserChange, // This object changes only when user interaction is committed
+
+       // --- Trigger based on relevant baseline changes ---
+       baselineState.showRate, // Affects interactive payload
+       baselineState.numYears, // Needed for validation inside fetchData
+
+       // --- Include the fetchData function itself ---
+       fetchData
+       // NOTE: We DO NOT include inputState here directly. The effect reads the *current* inputState
+       // when it runs, but changing inputState via setInputState inside fetchData's sync logic
+       // will NOT trigger the effect again unless the sync logic *also* updates lastUserChange (it doesn't).
     ]);
+
+
+  // --- Effect Hook for BASELINE API Calls ---
+  useEffect(() => {
+        if (!initialBaselineFetchDone.current) {
+            initialBaselineFetchDone.current = true;
+            console.log("Effect (Baseline): Initial Fetch Triggered");
+            fetchBaselineData(baselineState); // Fetch with current (initial) baseline state
+            return;
+        }
+
+        console.log("Effect (Baseline): RUNNING due to baselineState change.");
+        fetchBaselineData(baselineState);
+
+  }, [
+      // Dependencies: All parts of baselineState that define the baseline scenario
+      baselineState.baselineModeShares,
+      baselineState.baselinePopulationValues,
+      baselineState.baselineParkingSupplyValues,
+      baselineState.defaultParkingCost,
+      baselineState.showRate,
+      baselineState.numYears,
+      // startYear technically doesn't affect API payload but is part of baseline definition
+      baselineState.startYear,
+      fetchBaselineData // Include the function itself
+  ]);
 
 
   // --- Event Handlers (Defined ONCE WITH CONST using useCallback where beneficial) ---
 
-  // Handles direct input changes on Scenario Page (if any inputs existed there)
-  // Currently unused in V2.2 ScenarioPage but kept for potential future use
+  // Handles direct input changes on Scenario Page (if any - currently unused)
   const handleInputChange = useCallback((event) => {
       const { name, value } = event.target;
       if (name.startsWith('modeShares.')) {
           const mode = name.split('.')[1];
-          // NOTE: This direct handler might bypass the intended debounce/lastUserChange logic
-          // Prefer using handleModeShareChange for mode share updates.
           setInputState(prevState => ({ ...prevState, modeShares: { ...prevState.modeShares, [mode]: value } }));
       } else {
           console.warn("Handler: Unhandled input change on Scenario Page:", name);
       }
-  }, []); // No dependencies, safe for useCallback
+  }, []);
 
-  // Handles slider/numeric input changes for MODE SHARES (preferred method)
+  // Handles slider/numeric input changes for MODE SHARES
   const handleModeShareChange = useCallback((mode, newValue) => {
-      // Ensure value is somewhat numeric before setting state/triggering fetch
       const numericValue = Number(newValue);
       if (isNaN(numericValue)) {
           console.warn(`Handler: Invalid non-numeric value passed for mode ${mode}:`, newValue);
-          return; // Or handle as needed (e.g., reset to previous value?)
+          return;
       }
       // Update the input state immediately for responsive UI
       setInputState(prevState => ({ ...prevState, modeShares: { ...prevState.modeShares, [mode]: numericValue } }));
       // Track the specific change that should trigger the backend re-balancing
-      setLastUserChange({ mode: mode, value: numericValue });
+      setLastUserChange({ mode: mode, value: numericValue }); // <-- This triggers the interactive useEffect
       console.log(`Handler: Mode share change - Mode: ${mode}, Value: ${numericValue}`);
   }, []); // No dependencies, safe for useCallback
 
   // Handles commit from numeric text inputs for MODE SHARES
-  // Ensures the final committed value triggers the fetch
   const handleModeNumericInputCommit = useCallback((mode, commitedValue) => {
       // Update state (might be redundant if handleModeShareChange already did, but safe)
       setInputState(prevState => ({ ...prevState, modeShares: { ...prevState.modeShares, [mode]: commitedValue } }));
       // Ensure this final value is used for the fetch trigger
-      setLastUserChange({ mode: mode, value: commitedValue });
+      setLastUserChange({ mode: mode, value: commitedValue }); // <-- This triggers the interactive useEffect
       console.log(`Handler: Mode share commit - Mode: ${mode}, Value: ${commitedValue}`);
   }, []); // No dependencies, safe for useCallback
 
   // Resets the interactive scenario inputs back to the current baseline values
   const handleReset = useCallback(() => {
       console.log("Handler: Resetting scenario inputs to baseline:", baselineState);
-      // Reset inputState based on the CURRENT baselineState
-      setInputState({
+      const newInputState = {
           populationValues: [...baselineState.baselinePopulationValues],
           parkingSupplyValues: [...baselineState.baselineParkingSupplyValues],
-          parkingCost: baselineState.defaultParkingCost, // Reset interactive cost to baseline default
+          parkingCost: baselineState.defaultParkingCost,
           modeShares: { ...baselineState.baselineModeShares },
-      });
+      };
+      setInputState(newInputState); // Update input state
+
       // Also reset the intermediate number inputs on the setup page to match baseline
       setIntermediateNumberInputs({
           startYear: String(baselineState.startYear),
@@ -329,92 +421,112 @@ function App() {
           quickAnnualGrowthRate: String(baselineState.quickAnnualGrowthRate),
           quickStartParkingSupply: String(baselineState.quickStartParkingSupply),
       });
-      setError(null); // Clear any existing errors
-      setLastUserChange({ mode: null, value: null }); // Reset last change tracker
-      // The useEffect hook will trigger fetchData due to inputState change
-  }, [baselineState]); // Depends on baselineState
+      setError(null); // Clear interactive error
+      // Reset last change tracker to prevent immediate trigger if reset values match previous user change
+      const resetTriggerValue = { mode: null, value: null };
+      setLastUserChange(resetTriggerValue);
+      // Manually trigger fetch with reset state because setLastUserChange might not trigger if value is same
+      // Need to pass the *new* input state we just calculated
+      fetchData(newInputState, baselineState, resetTriggerValue.mode, resetTriggerValue.value);
+
+  }, [baselineState, fetchData]); // Depends on baselineState and fetchData
+
 
   // --- Handlers for Model Setup Page ---
 
-  // Updates the intermediate string state as the user types in baseline number fields
+  // Updates intermediate number state
   const handleBaselineNumberInputChange = useCallback((event) => {
       const { name, value } = event.target;
-      console.log(`Handler: Intermediate change ${name}: '${value}'`);
+      // console.log(`Handler: Intermediate change ${name}: '${value}'`); // Less noisy log
       setIntermediateNumberInputs(prevState => ({ ...prevState, [name]: value }));
-  }, []); // No dependencies needed
+  }, []);
 
-  // Commits the intermediate number input to the actual baselineState after validation/blur
+  // Commits intermediate number to baselineState
   const handleBaselineNumberCommit = useCallback((event) => {
       const { name } = event.target;
-      const value = intermediateNumberInputs[name]; // Get value from intermediate state
+      const value = intermediateNumberInputs[name];
       let numericValue;
 
-      // Convert to number, handling empty string as null temporarily
       if (value === null || value === undefined || String(value).trim() === '') {
           numericValue = null;
       } else {
           numericValue = Number(value);
       }
 
-      // If conversion failed (and input wasn't empty), revert intermediate state and return
       if (isNaN(numericValue) && value !== null && String(value).trim() !== '') {
           console.warn(`Handler: Invalid number commit for ${name}: '${value}'. Reverting intermediate input.`);
-          // Revert intermediate input back to the current value in baselineState
           setIntermediateNumberInputs(prevState => ({ ...prevState, [name]: String(baselineState[name]) }));
           return;
       }
 
-      console.log(`Handler: Committing ${name}:`, numericValue);
+      // console.log(`Handler: Committing ${name}:`, numericValue); // Less noisy log
 
-      // Update baselineState
       setBaselineState(prevState => {
           let valueToUse = numericValue;
-          // Assign defaults if user cleared the field (numericValue is null)
            if (valueToUse === null) {
                switch (name) {
                    case 'numYears': valueToUse = 1; break;
-                   case 'startYear': valueToUse = INITIAL_START_YEAR; break; // Use constant default
-                   case 'showRate': valueToUse = INITIAL_SHOW_RATE; break; // Use constant default
-                   case 'defaultParkingCost': valueToUse = INITIAL_PARKING_COST; break; // Use constant default
-                   case 'quickStartPopulation': valueToUse = 0; break; // Default to 0
-                   case 'quickAnnualGrowthRate': valueToUse = 0; break; // Default to 0
-                   case 'quickStartParkingSupply': valueToUse = 0; break; // Default to 0
-                   default: valueToUse = 0; break; // General fallback
+                   case 'startYear': valueToUse = INITIAL_START_YEAR; break;
+                   case 'showRate': valueToUse = INITIAL_SHOW_RATE; break;
+                   case 'defaultParkingCost': valueToUse = INITIAL_PARKING_COST; break;
+                   case 'quickStartPopulation': valueToUse = 0; break;
+                   case 'quickAnnualGrowthRate': valueToUse = 0; break;
+                   case 'quickStartParkingSupply': valueToUse = 0; break;
+                   default: valueToUse = 0; break;
                }
-               console.log(`Handler: Input for ${name} cleared, using default:`, valueToUse);
+               // console.log(`Handler: Input for ${name} cleared, using default:`, valueToUse); // Less noisy log
            }
 
-           // Clamp values within reasonable ranges
            let finalValue = valueToUse;
            switch (name) {
                case 'numYears': finalValue = Math.max(1, Math.min(50, Math.round(finalValue))); break;
                case 'startYear': finalValue = Math.max(1900, Math.min(2100, Math.round(finalValue))); break;
-               case 'showRate': finalValue = Math.max(0, Math.min(100, finalValue)); break; // Allow 0 show rate
+               case 'showRate': finalValue = Math.max(0, Math.min(100, finalValue)); break;
                case 'defaultParkingCost': finalValue = Math.max(0, Math.round(finalValue)); break;
                case 'quickStartPopulation': finalValue = Math.max(0, Math.round(finalValue)); break;
-               case 'quickAnnualGrowthRate': finalValue = Math.max(-100, Math.min(100, finalValue)); break; // Allow negative growth
+               case 'quickAnnualGrowthRate': finalValue = Math.max(-100, Math.min(100, finalValue)); break;
                case 'quickStartParkingSupply': finalValue = Math.max(0, Math.round(finalValue)); break;
            }
 
-           // If the clamped value hasn't changed, just ensure intermediate matches and return
            if (finalValue === prevState[name]) {
-               console.log(`Handler: Baseline ${name} - value unchanged after commit/clamping (${finalValue}), ensuring intermediate matches.`);
+               // console.log(`Handler: Baseline ${name} - value unchanged after commit/clamping (${finalValue}), ensuring intermediate matches.`); // Less noisy
                setIntermediateNumberInputs(prevIntermediate => ({ ...prevIntermediate, [name]: String(finalValue) }));
-               return prevState;
+               return prevState; // IMPORTANT: Return previous state ref if value didn't change
            }
 
-          console.log(`Handler: Baseline ${name} setting final state value:`, finalValue);
+          // console.log(`Handler: Baseline ${name} setting final state value:`, finalValue); // Less noisy log
           const newState = { ...prevState, [name]: finalValue };
 
-          // Recalculate derived arrays if relevant inputs changed
-          if (name === 'numYears' || name === 'quickStartPopulation' || name === 'quickAnnualGrowthRate') {
-              newState.baselinePopulationValues = calculatePopulationArray(newState.quickStartPopulation, newState.quickAnnualGrowthRate, newState.numYears);
-              console.log("Handler: Recalculated baselinePopulationValues:", newState.baselinePopulationValues);
+          // --- Array Resizing/Recalculation Logic ---
+          let needsPopulationRecalc = false;
+          let needsSupplyRecalc = false;
+
+          // If numYears changed, both need resizing/recalculation
+          if (name === 'numYears' && finalValue !== prevState.numYears) {
+              needsPopulationRecalc = true;
+              needsSupplyRecalc = true;
+              // Resize existing arrays based on *new* numYears
+              newState.baselinePopulationValues = resizeArray(prevState.baselinePopulationValues, finalValue);
+              newState.baselineParkingSupplyValues = resizeArray(prevState.baselineParkingSupplyValues, finalValue);
+              // Recalculate based on potentially changed quick start values *and* new length
+              newState.baselinePopulationValues = calculatePopulationArray(newState.quickStartPopulation, newState.quickAnnualGrowthRate, finalValue);
+              newState.baselineParkingSupplyValues = calculateSupplyArray(newState.quickStartParkingSupply, finalValue);
+              console.log("Handler: Recalculated baseline arrays due to numYears change:", finalValue);
+          } else {
+              // If numYears didn't change, check other triggers
+              if ((name === 'quickStartPopulation' && finalValue !== prevState.quickStartPopulation) ||
+                  (name === 'quickAnnualGrowthRate' && finalValue !== prevState.quickAnnualGrowthRate)) {
+                  needsPopulationRecalc = true;
+                  newState.baselinePopulationValues = calculatePopulationArray(newState.quickStartPopulation, newState.quickAnnualGrowthRate, newState.numYears);
+                  console.log("Handler: Recalculated baselinePopulationValues:", newState.baselinePopulationValues);
+              }
+              if (name === 'quickStartParkingSupply' && finalValue !== prevState.quickStartParkingSupply) {
+                  needsSupplyRecalc = true;
+                  newState.baselineParkingSupplyValues = calculateSupplyArray(newState.quickStartParkingSupply, newState.numYears);
+                  console.log("Handler: Recalculated baselineParkingSupplyValues:", newState.baselineParkingSupplyValues);
+              }
           }
-          if (name === 'numYears' || name === 'quickStartParkingSupply') {
-              newState.baselineParkingSupplyValues = calculateSupplyArray(newState.quickStartParkingSupply, newState.numYears);
-              console.log("Handler: Recalculated baselineParkingSupplyValues:", newState.baselineParkingSupplyValues);
-          }
+          // --- End Array Logic ---
 
           // Ensure intermediate input string matches the final committed numeric value
           setIntermediateNumberInputs(prevIntermediate => ({ ...prevIntermediate, [name]: String(finalValue) }));
@@ -423,26 +535,37 @@ function App() {
       });
   }, [intermediateNumberInputs, baselineState]); // Depends on intermediate and baseline states
 
-  // Handles changes to baseline mode shares on the setup page
+  // Handles changes to baseline mode shares on setup page
   const handleBaselineModeShareChange = useCallback((mode, newValue) => {
       const numericValue = Math.max(0, Math.min(100, Number(newValue) || 0));
-      console.log("Handler: Baseline Mode change:", mode, numericValue);
-      setBaselineState(prevState => ({
-          ...prevState,
-          baselineModeShares: { ...prevState.baselineModeShares, [mode]: numericValue }
-      }));
+      // console.log("Handler: Baseline Mode change:", mode, numericValue); // Less noisy log
+      setBaselineState(prevState => {
+          // Avoid state update if value hasn't changed
+          if (prevState.baselineModeShares[mode] === numericValue) {
+              return prevState;
+          }
+          return {
+              ...prevState,
+              baselineModeShares: { ...prevState.baselineModeShares, [mode]: numericValue }
+          };
+      });
   }, []); // No dependencies
 
-  // Handles changes to baseline population/supply array values on the setup page
+  // Handles changes to baseline array values on setup page
   const handleBaselineArrayValueChange = useCallback((arrayName, index, newValue) => {
       const numericValue = Math.max(0, Number(newValue) || 0);
-      console.log(`Handler: Baseline ${arrayName}[${index}] change:`, numericValue);
+      // console.log(`Handler: Baseline ${arrayName}[${index}] change:`, numericValue); // Less noisy log
       setBaselineState(prevState => {
           const newArray = [...prevState[arrayName]];
           if (index >= 0 && index < newArray.length) {
+              // Avoid state update if value hasn't changed
+              if (newArray[index] === numericValue) {
+                  return prevState;
+              }
               newArray[index] = numericValue;
+              return { ...prevState, [arrayName]: newArray };
           }
-          return { ...prevState, [arrayName]: newArray };
+          return prevState; // Return previous state if index is out of bounds
       });
   }, []); // No dependencies
 
@@ -452,11 +575,11 @@ function App() {
     color: 'white',
     textDecoration: 'none',
     fontWeight: isActive ? 'bold' : 'normal',
-    borderBottom: isActive ? '2px solid #ffeb3b' : 'none', // Example active style
+    borderBottom: isActive ? '2px solid #ffeb3b' : 'none',
     marginRight: '15px',
     paddingBottom: '4px',
-    borderRadius: 0, // Flat bottom edge
-    transition: 'border-bottom 0.2s ease-in-out', // Smooth transition
+    borderRadius: 0,
+    transition: 'border-bottom 0.2s ease-in-out',
   });
 
 
@@ -464,10 +587,10 @@ function App() {
   return (
     <>
       {/* --- Navigation AppBar --- */}
-      <AppBar position="static" sx={{ mb: 3, bgcolor: '#004d40' }}> {/* Example color */}
+      <AppBar position="static" sx={{ mb: 3, bgcolor: '#004d40' }}>
           <Toolbar>
               <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-                  SEA MOVES {/* Or your app name */}
+                  SEA MOVES
               </Typography>
               <Button component={NavLink} to="/" style={getNavLinkStyle}>
                   Scenario Tool
@@ -479,9 +602,10 @@ function App() {
       </AppBar>
 
       {/* --- Main Content Area --- */}
-      <Container maxWidth="xl"> {/* Use extra-large container */}
-          {/* Display global errors */}
-          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      <Container maxWidth="xl">
+          {/* Display global errors - separate for clarity */}
+          {error && <Alert severity="warning" sx={{ mb: 2 }}>Interactive Scenario Error: {error}</Alert>}
+          {baselineError && <Alert severity="error" sx={{ mb: 2 }}>Baseline Data Error: {baselineError}</Alert>}
 
           {/* --- Routing --- */}
           <Routes>
@@ -490,23 +614,25 @@ function App() {
                 path="/"
                 element={
                     <ScenarioPage
-                        // **** ADDED/MODIFIED PROPS for Step 1 ****
-                        baselineState={baselineState}
-                        loadingError={error} // Pass the main error state
-                        actualYears={Array.from({ length: baselineState.numYears }, (_, i) => baselineState.startYear + i)} // Calculate and pass years
-
-                        // --- Existing V2.2 props ---
-                        inputState={inputState}
-                        apiResponseData={apiResponseData}
-                        isLoading={isLoading}
+                        // --- Passed State & Data ---
+                        baselineState={baselineState} // Config values for baseline
+                        inputState={inputState} // Interactive scenario inputs
+                        apiResponseData={apiResponseData} // Interactive scenario results
+                        baselineApiResponseData={baselineApiResponseData} // Baseline scenario results
                         modes={MODES}
-                        onInputChange={handleInputChange} // Keep if needed by child controls?
+                        actualYears={Array.from({ length: baselineState.numYears }, (_, i) => baselineState.startYear + i)}
+
+                        // --- Loading & Error States ---
+                        isLoading={isLoading} // Interactive scenario loading
+                        interactiveError={error} // Interactive error
+                        baselineIsLoading={baselineIsLoading} // Baseline loading
+                        baselineError={baselineError} // Baseline error
+
+                        // --- Event Handlers ---
+                        // onInputChange={handleInputChange} // Pass only if explicitly needed by ScenarioPage/children
                         onModeShareChange={handleModeShareChange}
                         onModeNumericInputCommit={handleModeNumericInputCommit}
                         onReset={handleReset}
-                        // Pass startYear/numYears for potential direct use if needed, though actualYears is preferred
-                        startYear={baselineState.startYear}
-                        numYears={baselineState.numYears}
                     />
                 }
             />
@@ -516,7 +642,6 @@ function App() {
                 path="/setup"
                 element={
                     <ModelSetupPage
-                        // Pass necessary state and handlers
                         baselineState={baselineState}
                         intermediateNumberInputs={intermediateNumberInputs}
                         modes={MODES}
@@ -528,12 +653,9 @@ function App() {
                  }
              />
           </Routes>
-          {/* --- End Routing --- */}
-
       </Container>
-      {/* --- End Main Content Area --- */}
     </>
   );
 } // End of App component
 
-export default App; // MUST be at top level
+export default App;

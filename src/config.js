@@ -1,11 +1,25 @@
+// src/config.js
+
 export const API_BASE_URL = 'http://localhost:5001'; // Your backend URL
 
-export const MODES = [
-  "Drive", "Light Rail", "Bus", "Drop-off",
-  "Walk", "Carpool", "Vanpool", "Bike"
-];
+// **** CHANGE THIS ****
+// Define MODES as an object: { internal_key: "Display Name" }
+// Ensure keys match BASELINE_MODE_SHARES and API keys
+export const MODES = {
+  "Drive": "Drive",
+  "Light Rail": "Light Rail", // Make sure API uses "Light Rail"
+  "Bus": "Bus",
+  "Drop-off": "Drop-off",
+  "Walk": "Walk",
+  "Carpool": "Carpool",
+  "Vanpool": "Vanpool",
+  "Bike": "Bike"
+  // If you add Telework or Other, add them here too
+  // "Telework": "Telework",
+  // "Other": "Other",
+};
 
-// Match the backend defaults
+// Ensure keys here EXACTLY match the keys in the MODES object above
 export const BASELINE_MODE_SHARES = {
   "Drive": 71.0,
   "Light Rail": 10.0,
@@ -23,11 +37,25 @@ export const DEFAULT_PARKING_SUPPLY_STRING = "5000, 5100, 5100, 5200, 5200";
 export const DEFAULT_PARKING_COST = 5000;
 
 // Chart Colors (customize as needed)
+// NOTE: The component using this (ModeShareChart?) will need to iterate
+// over Object.keys(MODES) and use the index to get the color.
+// Ensure the order Object.keys provides is consistent or consider
+// changing this to an object mapping mode keys to colors for robustness.
 export const MODE_CHART_COLORS = [
-  // ============================================
-  // CHANGE COLOR AT INDEX 0:
-  'rgba(255, 99, 132, 1)', // REPLACE with the actual red from ParkingChart's borderColor
-  // ============================================
-    '#FFC107', '#2196F3', '#9C27B0',
-  '#FF5722', '#795548', '#607D8B','#4CAF50'
+  // Drive (assuming it's first in Object.keys(MODES))
+  'rgba(255, 99, 132, 1)', // Red (from your comment)
+  // Light Rail
+  '#FFC107', // Amber
+  // Bus
+  '#2196F3', // Blue
+  // Drop-off
+  '#9C27B0', // Purple
+  // Walk
+  '#FF5722', // Deep Orange
+  // Carpool
+  '#795548', // Brown
+  // Vanpool
+  '#607D8B', // Blue Grey
+  // Bike
+  '#4CAF50', // Green
 ];
