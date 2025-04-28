@@ -2,9 +2,10 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App.jsx'; // Your main application component
+import App from './app.jsx'; // Lowercase 'a', explicit extension
 import './index.css'; // Your global CSS file (ensure this path is correct)
 import { BrowserRouter } from 'react-router-dom'; // Import BrowserRouter
+import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 
 // Get the root element from your HTML (usually index.html)
 const rootElement = document.getElementById('root');
