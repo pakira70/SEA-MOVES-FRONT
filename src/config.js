@@ -1,6 +1,6 @@
 // src/config.js
 
-export const API_BASE_URL = 'http://localhost:5001'; // Your backend URL
+export const API_BASE_URL = 'https://sea-moves-back.onrender.com'; // Your backend URL
 
 // **** CHANGE THIS ****
 // Define MODES as an object: { internal_key: "Display Name" }
