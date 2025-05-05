@@ -1,4 +1,4 @@
-// src/pages/ScenarioPage.jsx - COMPLETE CODE with CORRECTED Trip Delta Calculation
+// src/pages/ScenarioPage.jsx - Added Baseline Demand Extraction & Year 1 Logic
 
 import React, { useMemo } from 'react';
 import PropTypes from 'prop-types';
@@ -14,7 +14,6 @@ const getLastElement = (arr) => {
     return arr[arr.length - 1];
 };
 
-// Helper to get an element at a specific index (e.g., the last index)
 const getElementAtIndex = (arr, index) => {
     if (!Array.isArray(arr) || index < 0 || index >= arr.length) { return undefined; }
     return arr[index];
@@ -27,7 +26,7 @@ function ScenarioPage({
   apiResponseData,
   baselineApiResponseData,
   modes,
-  actualYears, // We might not need this if using array index
+  actualYears,
   isLoading,
   interactiveError,
   baselineIsLoading,
@@ -37,111 +36,93 @@ function ScenarioPage({
   onReset,
 }) {
 
-    // --- Baseline Cost/Shortfall Calculation (No change needed) ---
+    // --- Baseline Cost/Shortfall Calculation (No change) ---
     const { baselineFinalYearCost, baselineFinalYearShortfall } = useMemo(() => {
         const result = { baselineFinalYearCost: null, baselineFinalYearShortfall: null };
         if (!baselineApiResponseData?.parking) { return result; }
-        const costPerYearArray = baselineApiResponseData.parking.cost_per_year;
-        result.baselineFinalYearCost = getLastElement(costPerYearArray);
-        const shortfallPerYearArray = baselineApiResponseData.parking.shortfall_per_year;
-        result.baselineFinalYearShortfall = Math.round(getLastElement(shortfallPerYearArray) ?? 0);
+        result.baselineFinalYearCost = getLastElement(baselineApiResponseData.parking.cost_per_year);
+        result.baselineFinalYearShortfall = Math.round(getLastElement(baselineApiResponseData.parking.shortfall_per_year) ?? 0);
         return result;
     }, [baselineApiResponseData]);
 
-    // --- Scenario Cost/Shortfall Calculation (No change needed) ---
+    // --- Scenario Cost/Shortfall Calculation (No change) ---
     const { scenarioFinalYearCost, scenarioFinalYearShortfall } = useMemo(() => {
         const result = { scenarioFinalYearCost: null, scenarioFinalYearShortfall: null };
         if (!apiResponseData?.parking) { return result; }
-        const costPerYearArray = apiResponseData.parking.cost_per_year;
-        result.scenarioFinalYearCost = getLastElement(costPerYearArray);
-        const shortfallPerYearArray = apiResponseData.parking.shortfall_per_year;
-        result.scenarioFinalYearShortfall = Math.round(getLastElement(shortfallPerYearArray) ?? 0);
+        result.scenarioFinalYearCost = getLastElement(apiResponseData.parking.cost_per_year);
+        result.scenarioFinalYearShortfall = Math.round(getLastElement(apiResponseData.parking.shortfall_per_year) ?? 0);
         return result;
     }, [apiResponseData]);
 
-    // --- Calculate Trip Deltas for FINAL YEAR using useMemo --- (CORRECTED LOGIC) ---
+    // --- Trip Delta Calculation (No change) ---
     const finalYearTripDeltas = useMemo(() => {
         console.log("[Memo - Trip Deltas] Calculating Absolute Trips...");
         const deltas = {};
         const modeKeys = Object.keys(modes || {});
-
-        // --- Check Prerequisites ---
-        if (!apiResponseData?.trips_per_mode_per_year || !apiResponseData?.population_per_year ||
-            !baselineApiResponseData?.trips_per_mode_per_year || !baselineApiResponseData?.population_per_year ||
-            modeKeys.length === 0 ) {
-            console.warn("[Memo - Trip Deltas] Missing required data arrays (trips_per_mode_per_year, population_per_year, or modes).");
-             modeKeys.forEach(key => { deltas[key] = null; });
-            return deltas;
-        }
-
+        if (!apiResponseData?.trips_per_mode_per_year || !apiResponseData?.population_per_year || !baselineApiResponseData?.trips_per_mode_per_year || !baselineApiResponseData?.population_per_year || modeKeys.length === 0 ) { console.warn("[Memo - Trip Deltas] Missing required data arrays."); modeKeys.forEach(key => { deltas[key] = null; }); return deltas; }
         const scenarioRatesPerModePerYear = apiResponseData.trips_per_mode_per_year;
         const baselineRatesPerModePerYear = baselineApiResponseData.trips_per_mode_per_year;
         const scenarioPopulationPerYear = apiResponseData.population_per_year;
         const baselinePopulationPerYear = baselineApiResponseData.population_per_year;
-
-        // --- Get Final Year Index ---
-        // Ensure arrays have the same length before proceeding
         const numYears = scenarioPopulationPerYear.length;
-        if (numYears === 0 || baselinePopulationPerYear.length !== numYears) {
-             console.warn("[Memo - Trip Deltas] Population array lengths mismatch or zero.");
-             modeKeys.forEach(key => { deltas[key] = null; });
-             return deltas;
-        }
+        if (numYears === 0 || baselinePopulationPerYear.length !== numYears) { console.warn("[Memo - Trip Deltas] Population array lengths mismatch or zero."); modeKeys.forEach(key => { deltas[key] = null; }); return deltas; }
         const finalYearIndex = numYears - 1;
-
-        // --- Get Final Year Population ---
         const scenarioFinalPopulation = getElementAtIndex(scenarioPopulationPerYear, finalYearIndex);
         const baselineFinalPopulation = getElementAtIndex(baselinePopulationPerYear, finalYearIndex);
-
-        if (scenarioFinalPopulation === undefined || baselineFinalPopulation === undefined) {
-             console.warn("[Memo - Trip Deltas] Could not get final year population.");
-             modeKeys.forEach(key => { deltas[key] = null; });
-             return deltas;
-        }
-        console.log(`[Memo - Trip Deltas] Final Pop - Scenario: ${scenarioFinalPopulation}, Baseline: ${baselineFinalPopulation}`);
-
-
-        // --- Calculate Absolute Trips and Deltas ---
+        if (scenarioFinalPopulation === undefined || baselineFinalPopulation === undefined) { console.warn("[Memo - Trip Deltas] Could not get final year population."); modeKeys.forEach(key => { deltas[key] = null; }); return deltas; }
         modeKeys.forEach((modeKey) => {
-            // Get rate arrays for the mode
             const scenarioModeRateArray = Array.isArray(scenarioRatesPerModePerYear?.[modeKey]) ? scenarioRatesPerModePerYear[modeKey] : [];
             const baselineModeRateArray = Array.isArray(baselineRatesPerModePerYear?.[modeKey]) ? baselineRatesPerModePerYear[modeKey] : [];
-
-            // Get final year rates
             const scenarioFinalRate = getElementAtIndex(scenarioModeRateArray, finalYearIndex);
             const baselineFinalRate = getElementAtIndex(baselineModeRateArray, finalYearIndex);
-
-            console.log(`[Memo - Trip Deltas] Mode: ${modeKey} | Final Rates - Scenario: ${scenarioFinalRate}, Baseline: ${baselineFinalRate}`);
-
-            // Convert rates and population to numbers
             const scRateNum = Number(scenarioFinalRate ?? NaN);
             const blRateNum = Number(baselineFinalRate ?? NaN);
             const scPopNum = Number(scenarioFinalPopulation);
             const blPopNum = Number(baselineFinalPopulation);
-
-
             if (!isNaN(scRateNum) && !isNaN(blRateNum) && !isNaN(scPopNum) && !isNaN(blPopNum)) {
-                // Calculate absolute trips assuming rate is per 100 people
                 const scenarioAbsoluteTrips = (scPopNum / 100) * scRateNum;
                 const baselineAbsoluteTrips = (blPopNum / 100) * blRateNum;
-
-                 console.log(`[Memo - Trip Deltas] Mode: ${modeKey} | Abs Trips - Scenario: ${scenarioAbsoluteTrips.toFixed(1)}, Baseline: ${baselineAbsoluteTrips.toFixed(1)}`);
-
-                // Calculate the delta
                 deltas[modeKey] = scenarioAbsoluteTrips - baselineAbsoluteTrips;
-
-            } else {
-                console.warn(`[Memo - Trip Deltas] Non-numeric rate or pop for mode: ${modeKey}. Setting delta to null.`);
-                deltas[modeKey] = null; // Assign null for invalid data
-            }
-             console.log(`[Memo - Trip Deltas] Mode: ${modeKey} | Calculated Delta: ${deltas[modeKey]?.toFixed(1)}`);
+            } else { deltas[modeKey] = null; }
         });
-
         console.log("[Memo - Trip Deltas] FINAL Calculated deltas object:", deltas);
         return deltas;
-
     }, [apiResponseData, baselineApiResponseData, modes]);
-    // --- End of Trip Delta Calculation ---
+
+
+    // --- Extract Baseline Parking Demand Array ---
+    const baselineParkingDemand = useMemo(() => {
+        return baselineApiResponseData?.parking?.demand_per_year ?? [];
+    }, [baselineApiResponseData]);
+
+
+    // --- **** NEW: Create Adjusted Scenario Parking Demand **** ---
+    // This ensures the first year of scenario demand matches the first year of baseline demand
+    const adjustedScenarioParkingDemand = useMemo(() => {
+        const rawScenarioDemand = apiResponseData?.parking?.demand_per_year;
+
+        // Basic validation: ensure both arrays are present and non-empty
+        if (
+            !Array.isArray(baselineParkingDemand) || baselineParkingDemand.length === 0 ||
+            !Array.isArray(rawScenarioDemand) || rawScenarioDemand.length === 0
+           ) {
+            console.warn("[Memo - Adj Parking Demand] Missing or empty demand arrays. Returning raw scenario demand (or empty).");
+            return rawScenarioDemand || []; // Return raw or empty if invalid
+        }
+
+        // More robust validation: check for matching lengths (optional but good practice)
+        if (baselineParkingDemand.length !== rawScenarioDemand.length) {
+            console.warn("[Memo - Adj Parking Demand] Baseline and Scenario demand arrays have different lengths. Returning raw scenario demand.");
+            return rawScenarioDemand;
+        }
+
+        // Create the adjusted array
+        const adjusted = [...rawScenarioDemand]; // Start with a copy of scenario demand
+        adjusted[0] = baselineParkingDemand[0]; // Set the first element to the baseline's first element
+        return adjusted;
+
+    }, [baselineParkingDemand, apiResponseData?.parking?.demand_per_year]);
+    // --- **** END NEW **** ---
 
 
     const finalYear = actualYears && actualYears.length > 0 ? getLastElement(actualYears) : null;
@@ -158,7 +139,16 @@ function ScenarioPage({
                             {!apiResponseData && isLoading && !interactiveError && ( <Box sx={styles.centerBox}><CircularProgress /></Box> )}
                             {!apiResponseData && interactiveError && ( <Box sx={styles.centerBox}><Typography color="error">Error loading scenario: {interactiveError}</Typography></Box> )}
                             {!apiResponseData && !isLoading && !interactiveError && ( <Box sx={styles.centerBox}><Typography>Adjust inputs to generate scenario results.</Typography></Box> )}
-                            {apiResponseData && (<VisualizationsPanel data={apiResponseData} modes={modes} actualYears={actualYears} />)}
+                            {/* Pass baseline demand AND adjusted scenario demand to VisualizationsPanel */}
+                            {apiResponseData && (
+                                <VisualizationsPanel
+                                    scenarioData={apiResponseData}           // Pass full scenario data for other charts
+                                    baselineParkingDemand={baselineParkingDemand} // Pass baseline demand array
+                                    adjustedScenarioParkingDemand={adjustedScenarioParkingDemand} // <-- Pass NEW adjusted demand
+                                    modes={modes}
+                                    actualYears={actualYears}
+                                />
+                            )}
                             {isLoading && apiResponseData && ( <Box sx={styles.loadingOverlay}><CircularProgress size={40} /></Box> )}
                         </Paper>
                     </Grid>
@@ -186,21 +176,10 @@ function ScenarioPage({
                     <Typography variant="h6" gutterBottom>
                         Change in Daily Trips ({finalYear ?? 'Final Year'}) vs Baseline
                     </Typography>
-                     {(baselineIsLoading || isLoading) && (
-                         <Box sx={styles.centerBoxSmall}><CircularProgress size={24} /></Box>
-                     )}
-                     {(!baselineIsLoading && !isLoading && (baselineError || interactiveError)) && (
-                         <Typography color="error" sx={{p:1}}>Cannot calculate trip deltas due to data errors.</Typography>
-                     )}
-                     {!baselineIsLoading && !isLoading && !baselineError && !interactiveError && canShowDeltaDisplay && (
-                         <TripDeltaDisplay
-                             deltas={finalYearTripDeltas}
-                             modes={modes}
-                         />
-                     )}
-                      {!baselineIsLoading && !isLoading && !baselineError && !interactiveError && !canShowDeltaDisplay && (
-                         <Typography sx={{p:1, fontStyle: 'italic'}}>Mode configuration missing.</Typography>
-                     )}
+                     {(baselineIsLoading || isLoading) && ( <Box sx={styles.centerBoxSmall}><CircularProgress size={24} /></Box> )}
+                     {(!baselineIsLoading && !isLoading && (baselineError || interactiveError)) && ( <Typography color="error" sx={{p:1}}>Cannot calculate trip deltas due to data errors.</Typography> )}
+                     {!baselineIsLoading && !isLoading && !baselineError && !interactiveError && canShowDeltaDisplay && ( <TripDeltaDisplay deltas={finalYearTripDeltas} modes={modes} /> )}
+                     {!baselineIsLoading && !isLoading && !baselineError && !interactiveError && !canShowDeltaDisplay && ( <Typography sx={{p:1, fontStyle: 'italic'}}>Mode configuration missing.</Typography> )}
                 </Paper>
             </Grid>
 
@@ -209,12 +188,9 @@ function ScenarioPage({
                 <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column' }}>
                     <Typography variant="h6" gutterBottom>Interactive Scenario Inputs</Typography>
                     <ControlsPanel
-                        inputState={inputState}
-                        modes={modes}
-                        onModeShareChange={onModeShareChange}
-                        onModeNumericInputCommit={onModeNumericInputCommit}
-                        onReset={onReset}
-                        isLoading={isLoading}
+                        inputState={inputState} modes={modes}
+                        onModeShareChange={onModeShareChange} onModeNumericInputCommit={onModeNumericInputCommit}
+                        onReset={onReset} isLoading={isLoading}
                     />
                 </Paper>
             </Grid>

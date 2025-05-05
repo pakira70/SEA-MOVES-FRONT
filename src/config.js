@@ -43,7 +43,7 @@ export const DEFAULT_PARKING_COST = 5000;
 // changing this to an object mapping mode keys to colors for robustness.
 export const MODE_CHART_COLORS = [
   // Drive (assuming it's first in Object.keys(MODES))
-  'rgba(255, 99, 132, 1)', // Red (from your comment)
+  '#d42f2f', // Red (from your comment)
   // Light Rail
   '#FFC107', // Amber
   // Bus

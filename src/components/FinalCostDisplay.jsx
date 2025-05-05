@@ -1,4 +1,4 @@
-// src/components/FinalCostDisplay.jsx - RESTORED to state before width/glitch fixes
+// src/components/FinalCostDisplay.jsx - Updated Baseline Cost Color
 
 import React from 'react';
 import PropTypes from 'prop-types';
@@ -21,11 +21,11 @@ const formatNumber = (num) => {
     return Math.round(num).toLocaleString('en-US');
 };
 
-// Define a minimum height for the main cost display lines
-const costLineMinHeight = '2.5rem'; // Keep this fix
+const costLineMinHeight = '2.5rem';
+const stallDifferenceBlue = '#2196F3'; // Or use theme color like 'info.main'
 
-// Define the blue color for stall difference
-const stallDifferenceBlue = '#2196F3';
+// Define the specific red color for consistency
+const baselineRedColor = 'rgb(212, 47, 47)';
 
 function FinalCostDisplay({
     baselineCost, scenarioCost, baselineShortfall, scenarioShortfall,
@@ -43,6 +43,7 @@ function FinalCostDisplay({
         costDifference = scenarioCost - baselineCost;
         const absDifference = Math.abs(costDifference); const formattedDifference = formatCurrency(absDifference);
         if (costDifference < -1e-7) { costDifferenceText = `${formattedDifference} Savings`; costDifferenceColor = 'success.main'; CostDifferenceIcon = CheckCircleOutlineIcon; }
+        // Using warning color for added cost might be better than red, which implies error
         else if (costDifference > 1e-7) { costDifferenceText = `+${formattedDifference} Added Cost`; costDifferenceColor = 'warning.dark'; CostDifferenceIcon = WarningAmberIcon; }
         else { costDifferenceText = `${formatCurrency(0)} No Change`; costDifferenceColor = 'text.secondary'; }
     } else if (error) { costDifferenceText = 'Cannot calculate'; costDifferenceColor = 'error.main'; CostDifferenceIcon = ErrorOutlineIcon; }
@@ -72,7 +73,7 @@ function FinalCostDisplay({
                         <Typography variant="h6" component="div">Parking Impact</Typography>
                         <Typography variant="caption" color="text.secondary" component="div">Projections for Final Year ({displayYear})</Typography>
                     </Box>
-                    <Tooltip title={`Comparison of projected parking cost and shortfall in the final simulation year (${displayYear}).`}>
+                    <Tooltip title={`Comparison of projected parking cost and shortfall in the final simulation year (${displayYear}). Cost primarily driven by Drive mode share.`}>
                         <IconButton size="small" sx={{ mt: 0.5, color: 'action.active' }}> <InfoOutlinedIcon fontSize="inherit" /> </IconButton>
                     </Tooltip>
                 </Box>
@@ -87,20 +88,26 @@ function FinalCostDisplay({
                             {/* Baseline */}
                             <Box sx={{ mb: 2 }}>
                                 <Typography variant="body1" color="text.secondary">Baseline Projection:</Typography>
-                                <Typography variant="h5" sx={{ fontWeight: 'medium', minHeight: costLineMinHeight, color: 'red', lineHeight: 1.2 }}>{formatCurrency(baselineCost)}</Typography>
+                                {/* --- CHANGE HERE: Use specific red color --- */}
+                                <Typography variant="h5" sx={{ fontWeight: 'medium', minHeight: costLineMinHeight, color: baselineRedColor, lineHeight: 1.2 }}>
+                                    {formatCurrency(baselineCost)}
+                                </Typography>
                                 <Typography variant="body2" sx={{ color: 'text.secondary', mt: -0.5 }}>({formatNumber(baselineShortfall)} stalls needed)</Typography>
                             </Box>
                             {/* Scenario */}
                             <Box>
                                 <Typography variant="body1" color="text.secondary">Scenario Projection:</Typography>
-                                <Typography variant="h5" sx={{ fontWeight: 'medium', minHeight: costLineMinHeight, lineHeight: 1.2 }}>{formatCurrency(scenarioCost)}</Typography>
+                                {/* Scenario cost can keep default color or use a different one */}
+                                <Typography variant="h5" sx={{ fontWeight: 'medium', minHeight: costLineMinHeight, lineHeight: 1.2 }}>
+                                    {formatCurrency(scenarioCost)}
+                                </Typography>
                                 <Typography variant="body2" sx={{ color: 'text.secondary', mt: -0.5 }}>({formatNumber(scenarioShortfall)} stalls needed)</Typography>
                             </Box>
                         </Box>
 
-                        {/* Bottom part: Differences (with divider) - Simple Layout */}
+                        {/* Bottom part: Differences */}
                         <Box sx={{ mt: 2, pt: 1.5, borderTop: 1, borderColor: 'divider' }}>
-                            {/* Cost Difference */}
+                             {/* Cost Difference */}
                             <Box sx={{ mb: 1.5 }}>
                                  <Typography variant="body1" color="text.secondary">Cost Difference:</Typography>
                                  <Box sx={{ display: 'flex', alignItems: 'center', color: costDifferenceColor, mt: 0.5 }}>
@@ -125,8 +132,26 @@ function FinalCostDisplay({
 }
 
 // --- Prop Types ---
-FinalCostDisplay.propTypes = { /* ... include shortfall ... */ };
+FinalCostDisplay.propTypes = {
+    baselineCost: PropTypes.number,
+    scenarioCost: PropTypes.number,
+    baselineShortfall: PropTypes.number,
+    scenarioShortfall: PropTypes.number,
+    baselineCostLoading: PropTypes.bool.isRequired,
+    baselineCostError: PropTypes.string,
+    scenarioLoading: PropTypes.bool.isRequired,
+    scenarioError: PropTypes.string,
+    finalYear: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+};
 // --- Default Props ---
-FinalCostDisplay.defaultProps = { /* ... include shortfall ... */ };
+FinalCostDisplay.defaultProps = {
+    baselineCost: null,
+    scenarioCost: null,
+    baselineShortfall: null,
+    scenarioShortfall: null,
+    baselineCostError: null,
+    scenarioError: null,
+    finalYear: null,
+};
 
 export default FinalCostDisplay;
