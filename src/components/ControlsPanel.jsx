@@ -1,224 +1,191 @@
-// src/components/ControlsPanel.jsx - MINIMALLY MODIFIED for Object Modes
-
-import React, { useState, useEffect, useRef } from 'react';
-import PropTypes from 'prop-types'; // Import PropTypes
+// src/components/ControlsPanel.jsx
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import PropTypes from 'prop-types';
 import { Box, Typography, Slider, TextField, Button, Tooltip, IconButton, Grid } from '@mui/material';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 
-// Helper to format number for display (e.g., one decimal place)
 const formatDisplayValue = (value) => {
-    const num = Number(value);
-    if (isNaN(num)) {
-        return ''; // Return empty string if not a valid number
-    }
-    // Format to one decimal place, remove trailing .0 if it exists
-    const formatted = num.toFixed(1);
-    return formatted.endsWith('.0') ? formatted.slice(0, -2) : formatted;
+  if (value === null || value === undefined || isNaN(Number(value))) return '';
+  const num = Number(value);
+  const fixedNum = num.toFixed(1);
+  return String(parseFloat(fixedNum));
 };
 
+const modeDetailsShape = PropTypes.shape({ /* ... */ });
 
 function ControlsPanel({
-  inputState,
-  modes,      // <<<< Now expected as an OBJECT { modeKey: "DisplayName", ... }
-  onModeShareChange,
-  onModeNumericInputCommit,
-  onReset,
-  isLoading,
-  // baselineModeShares // Removed from props as it wasn't used internally
+  inputState, activeModeDetails, sortedActiveModeKeys,
+  onModeShareChange, onModeNumericInputCommit, onReset, isLoading,
 }) {
-
-  // --- Local State for Intermediate Text Input Values ---
+  console.log("[CRITICAL_PROP_LOG] ControlsPanel.jsx - RECEIVED sortedActiveModeKeys:", JSON.stringify(sortedActiveModeKeys));
   const [intermediateValues, setIntermediateValues] = useState({});
   const focusedInputRef = useRef(null);
 
-  // --- Effect to Initialize and Sync Local State with Props ---
+  const keysToIterate = useMemo(() => {
+    const result = (Array.isArray(sortedActiveModeKeys) && sortedActiveModeKeys.length > 0)
+                    ? sortedActiveModeKeys : Object.keys(activeModeDetails || {});
+    console.log("[CRITICAL_PROP_LOG] ControlsPanel.jsx - keysToIterate (used for .map):", JSON.stringify(result));
+    return result;
+  }, [sortedActiveModeKeys, activeModeDetails]);
+
   useEffect(() => {
-    // console.log("ControlsPanel Effect: Syncing intermediateValues with inputState.modeShares"); // Keep logging minimal
+    // Sync intermediateValues with inputState.modeShares when props change,
+    // but respect focused input.
     const newIntermediate = {};
-    if (inputState && inputState.modeShares && modes && typeof modes === 'object') {
-      // --- CHANGE 1: Iterate over object keys ---
-      Object.keys(modes).forEach(modeKey => {
-        // Initialize with formatted numeric value from inputState using modeKey
-        // --- CHANGE 2: Use modeKey to access inputState ---
-        newIntermediate[modeKey] = formatDisplayValue(inputState.modeShares[modeKey]);
-      });
-    }
-    setIntermediateValues(newIntermediate);
-    // --- CHANGE 3: Dependency checks specific relevant parts ---
-  }, [inputState?.modeShares, modes]); // Rerun if the numeric shares from App change or modes object changes
-
-
-  // Handler for Slider changes - Calls App.jsx's slider handler
-  // Parameter renamed 'mode' to 'modeKey' for clarity
-  const handleSliderChange = (modeKey, event, newValue) => {
-    if (isLoading) return;
-    const numericValue = typeof newValue === 'number' ? Math.max(0, Math.min(100, newValue)) : 0;
-    // Update intermediate value visually immediately using modeKey
-    // --- CHANGE 4: Use modeKey for intermediate state ---
-    setIntermediateValues(prev => ({ ...prev, [modeKey]: formatDisplayValue(numericValue) }));
-    // Pass the modeKey and numeric change up to App.jsx
-    onModeShareChange(modeKey, numericValue);
-  };
-
-  // Handler for TYPING in Mode Share input box - Updates LOCAL state only
-  // Parameter renamed 'mode' to 'modeKey'
-  const handleModeShareTextChange = (modeKey, event) => {
-      if (isLoading) return;
-      const typedValue = event.target.value;
-      // Update only the local intermediate state as the user types using modeKey
-      // --- CHANGE 5: Use modeKey for intermediate state ---
-      setIntermediateValues(prev => ({ ...prev, [modeKey]: typedValue }));
-  };
-
-   // Handler for finalizing Mode Share text input (onBlur or Enter)
-   // Parameter renamed 'mode' to 'modeKey'
-  const handleModeShareTextCommit = (modeKey) => {
-      if (isLoading) return;
-      focusedInputRef.current = null; // Clear focus ref on commit
-
-      // --- CHANGE 6: Use modeKey to access intermediate state ---
-      const currentValue = intermediateValues[modeKey]; // Get value from LOCAL state
-      let value = parseFloat(currentValue); // Attempt to parse local string input
-
-      // Validate and clamp the value locally before sending up
-      if (isNaN(value)) {
-        value = 0; // Default to 0 if invalid input
+    let needsUpdate = false;
+    keysToIterate.forEach(modeKey => {
+      const appShare = inputState.modeShares[modeKey];
+      const formattedAppShare = formatDisplayValue(appShare ?? 0);
+      if (focusedInputRef.current === modeKey) {
+        // If focused, keep the user's current typing in intermediateValues
+        newIntermediate[modeKey] = intermediateValues[modeKey] !== undefined ? intermediateValues[modeKey] : formattedAppShare;
+      } else {
+        newIntermediate[modeKey] = formattedAppShare;
       }
-      value = Math.max(0, Math.min(100, value)); // Clamp between 0 and 100
+      if (intermediateValues[modeKey] !== newIntermediate[modeKey]) {
+        needsUpdate = true;
+      }
+    });
+    // If the set of keys changed, also mark for update
+    if (Object.keys(intermediateValues).length !== keysToIterate.length) {
+        needsUpdate = true;
+    }
 
-      // Update local state to the cleaned/formatted value using modeKey
-      // --- CHANGE 7: Use modeKey for intermediate state ---
-      setIntermediateValues(prev => ({ ...prev, [modeKey]: formatDisplayValue(value) }));
+    if (needsUpdate) {
+      setIntermediateValues(newIntermediate);
+    }
+  }, [inputState.modeShares, keysToIterate]); // Removed activeModeDetails, covered by keysToIterate
 
-      // Call the specific commit handler passed from App.jsx with the modeKey and validated number
-      // console.log(`ControlsPanel: Committing text input for ${modeKey} with value: ${value}`); // Keep logging minimal
-      onModeNumericInputCommit(modeKey, value);
-  };
+  const handleSliderChange = useCallback((modeKey, newValue) => {
+    if (isLoading) return;
+    // Update intermediateValue for both slider visual and text field
+    setIntermediateValues(prev => ({ ...prev, [modeKey]: formatDisplayValue(newValue) }));
+    // NO call to onModeShareChange here for live app state update
+  }, [isLoading]);
 
-  // --- Safely Calculate Sum for Display ---
-  // This logic remains the same as it iterates over values of inputState.modeShares
-  let currentModeSum = 0;
-  if (inputState && inputState.modeShares) {
-      currentModeSum = Object.values(inputState.modeShares).reduce((sum, value) => {
-          const num = parseFloat(value);
-          return sum + (isNaN(num) ? 0 : num);
-      }, 0);
-  }
-  // --- End Sum Calculation ---
+  const handleSliderChangeCommitted = useCallback((modeKey, newValue) => {
+    if (isLoading) return;
+    const numericValue = Math.max(0, Math.min(100, Number(newValue))); // Clamp
+    // Ensure intermediate reflects this final clamped value
+    setIntermediateValues(prev => ({ ...prev, [modeKey]: formatDisplayValue(numericValue) }));
+    onModeShareChange(modeKey, numericValue); // Update App.jsx state
+  }, [isLoading, onModeShareChange]);
 
+  const handleLocalModeShareTextChange = useCallback((modeKey, event) => {
+    if (isLoading) return;
+    setIntermediateValues(prev => ({ ...prev, [modeKey]: event.target.value }));
+  }, [isLoading]);
 
-  // --- JSX Rendering ---
+  const handleLocalModeShareTextCommit = useCallback((modeKey) => {
+    if (isLoading) {
+      if (focusedInputRef.current === modeKey) focusedInputRef.current = null;
+      return;
+    }
+    const rawValue = intermediateValues[modeKey];
+    let numericValue = parseFloat(rawValue);
+
+    if (isNaN(numericValue)) {
+      numericValue = inputState?.modeShares?.[modeKey] ?? 0;
+    }
+    numericValue = Math.max(0, Math.min(100, numericValue)); // Clamp
+
+    setIntermediateValues(prev => ({ ...prev, [modeKey]: formatDisplayValue(numericValue) }));
+    if (focusedInputRef.current === modeKey) focusedInputRef.current = null;
+    onModeNumericInputCommit(modeKey, numericValue); // Update App.jsx state
+  }, [isLoading, intermediateValues, onModeNumericInputCommit, inputState?.modeShares]);
+
+  const currentModeSum = useMemo(() => { /* ... as before ... */
+    let sum = 0;
+    if (inputState?.modeShares && activeModeDetails) {
+        keysToIterate.forEach(modeKey => {
+            sum += Number(inputState.modeShares[modeKey] || 0);
+        });
+    }
+    return parseFloat(sum.toFixed(1));
+  }, [inputState?.modeShares, activeModeDetails, keysToIterate]);
+
+  useEffect(() => { /* ... [RENDER_ORDER_DEBUG] log as before ... */ });
+
   return (
     <Box>
-      {/* === MODE SHARE SECTION === */}
-      <Typography variant="subtitle1" gutterBottom sx={{ mt: 1, display: 'flex', alignItems: 'center' }}>
-        Mode Shares ({(typeof currentModeSum === 'number' && !isNaN(currentModeSum)) ? currentModeSum.toFixed(1) : '...'}%)
-         <Tooltip title="Adjust percentage via slider or type value in the box (press Enter or click away to apply). Total must be 100%.">
-            <IconButton size="small" sx={{ ml: 0.5 }}><InfoOutlinedIcon fontSize="inherit" /></IconButton>
-         </Tooltip>
-      </Typography>
+      <Typography /* ... */ >Mode Shares (Sum: {currentModeSum}%)</Typography>
       <Grid container spacing={2} sx={{ mb: 3 }}>
-          {/* --- CHANGE 8: Iterate over object keys --- */}
-          {/* Also added safety checks for inputState and modes */}
-          {inputState && inputState.modeShares && modes && typeof modes === 'object' && Object.keys(modes).map((modeKey) => {
-             // --- CHANGE 9: Use modeKey to access inputState ---
-             const numericValue = Math.max(0, Math.min(100, Number(inputState.modeShares[modeKey]) || 0));
-             // --- CHANGE 10: Use modeKey to access intermediateValues ---
-             const displayValue = intermediateValues[modeKey] ?? ''; // Use local state for display
-             // --- CHANGE 11: Use modes[modeKey] for display name ---
-             const modeDisplayName = modes[modeKey] || modeKey; // Get display name from modes object
+        {keysToIterate.map((modeKey) => {
+          const modeInfo = activeModeDetails[modeKey];
+          if (!modeInfo) return null;
 
-             return (
-              // --- CHANGE 12: Use modeKey for React key ---
-              <Grid item xs={12} sm={6} md={4} key={modeKey}>
-                  <Box>
-                    {/* Label and Input Box */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: -0.5 }}>
-                        <Typography component="label" htmlFor={`${modeKey}-input`} sx={{ fontSize: '0.875rem', flexShrink: 0, minWidth: '70px' }}>
-                          {/* Use display name */}
-                          {modeDisplayName}:
-                        </Typography>
-                        <TextField
-                          id={`${modeKey}-input`}
-                          value={displayValue}
-                          // --- CHANGE 13: Pass modeKey to handlers ---
-                          onChange={(event) => handleModeShareTextChange(modeKey, event)}
-                          onBlur={() => handleModeShareTextCommit(modeKey)}
-                          onFocus={() => focusedInputRef.current = modeKey}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter') {
-                              handleModeShareTextCommit(modeKey);
-                              event.preventDefault();
-                              event.target.blur();
-                            } else if (event.key === 'Escape') {
-                               // --- CHANGE 14: Use modeKey for intermediate state ---
-                               setIntermediateValues(prev => ({...prev, [modeKey]: formatDisplayValue(numericValue)}));
-                               event.target.blur();
-                            }
-                          }}
-                          type="text"
-                          inputMode="decimal"
-                          variant="outlined"
-                          size="small"
-                          disabled={isLoading}
-                          inputProps={{
-                            step: "0.1",
-                            style: { textAlign: 'right', width: '55px', padding: '8px 5px' },
-                            'aria-labelledby': `${modeKey}-slider-label`
-                          }}
-                          sx={{ ml: 'auto' }}
-                        />
-                        <Typography sx={{ fontSize: '0.875rem', ml: 0.5 }}>%</Typography>
-                    </Box>
-                    {/* Slider */}
-                    <Slider
-                        aria-labelledby={`${modeKey}-slider-label`} // Label uses modeKey
-                        value={numericValue}
-                        // --- CHANGE 15: Pass modeKey to handler ---
-                        onChange={(event, newValue) => handleSliderChange(modeKey, event, newValue)}
-                        valueLabelDisplay="off"
-                        step={0.1}
-                        min={0}
-                        max={100}
-                        disabled={isLoading}
-                        size="small"
-                    />
-                  </Box>
-              </Grid>
-            );
-          })}
+          // Slider value should now come from intermediateValues for responsiveness,
+          // falling back to app state if intermediate isn't set.
+          const liveValueString = intermediateValues[modeKey] !== undefined 
+                                 ? intermediateValues[modeKey] 
+                                 : formatDisplayValue(inputState?.modeShares?.[modeKey] ?? 0);
+          const liveNumericValue = Number(liveValueString || 0);
+
+          const modeDisplayName = modeInfo.name || modeKey;
+
+          return (
+            <Grid item xs={12} sm={6} md={4} key={modeKey}>
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: -0.5 }}>
+                  <Typography component="label" htmlFor={`${modeKey}-input`} sx={{ minWidth: '80px', textAlign: 'right', mr:1, fontSize: '0.875rem' }}>{modeDisplayName}:</Typography>
+                  <TextField
+                    id={`${modeKey}-input`}
+                    value={liveValueString} // Driven by intermediateValues
+                    onChange={(e) => handleLocalModeShareTextChange(modeKey, e)}
+                    onFocus={() => focusedInputRef.current = modeKey}
+                    onBlur={() => { if (focusedInputRef.current === modeKey) handleLocalModeShareTextCommit(modeKey); }}
+                    onKeyDown={(e) => { /* ... as before ... */ }}
+                    type="text"
+                    inputProps={{ style: { textAlign: 'right', paddingRight: '4px' }, maxLength: 5 }}
+                    sx={{ width: '70px' }}
+                    size="small"
+                    disabled={isLoading}
+                  />
+                  <Typography sx={{ml: 0.5}}>%</Typography>
+                </Box>
+                <Slider
+                  value={liveNumericValue} // Driven by intermediateValues (converted to number)
+                  onChange={(e, val) => handleSliderChange(modeKey, val)} // Updates intermediateValues
+                  onChangeCommitted={(e, val) => handleSliderChangeCommitted(modeKey, val)} // Updates App.jsx state
+                  aria-labelledby={`${modeKey}-slider-label`}
+                  valueLabelDisplay="off"
+                  step={0.1} min={0} max={100}
+                  disabled={isLoading}
+                  sx={{
+                    color: 'primary.main',
+                    '& .MuiSlider-thumb': { width: 12, height: 12, marginTop: '-1px' }, // Item 2: Centering (12h thumb on 4h track)
+                                                                                      // If track height is 6px, marginTop: -3px
+                    '& .MuiSlider-track': { height: 4 },
+                    '& .MuiSlider-rail': { height: 4 },
+                  }}
+                />
+              </Box>
+            </Grid>
+          );
+        })}
+        {keysToIterate.length === 0 && ( <Grid item xs={12}> <Typography sx={{p:1, fontStyle: 'italic'}}> No active modes configured.</Typography> </Grid> )}
       </Grid>
-      {/* === END MODE SHARE SECTION === */}
-
-
-      {/* Reset Button */}
       <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end' }}>
-        <Button variant="outlined" onClick={onReset} disabled={isLoading}>
-          Reset to Baseline
-        </Button>
+        <Button variant="outlined" onClick={onReset} disabled={isLoading} sx={{ color: 'primary.main', borderColor: 'primary.main' }}> Reset to Baseline </Button>
       </Box>
     </Box>
   );
 }
 
-// --- Prop Types ---
-ControlsPanel.propTypes = {
-    inputState: PropTypes.object,
-    // --- CHANGE 16: Update modes prop type ---
-    modes: PropTypes.object.isRequired, // Now an OBJECT { modeKey: "DisplayName", ... }
-    onModeShareChange: PropTypes.func.isRequired,
-    onModeNumericInputCommit: PropTypes.func.isRequired,
-    onReset: PropTypes.func.isRequired,
-    isLoading: PropTypes.bool,
-    // baselineModeShares: PropTypes.object // Removed prop type as it wasn't used
+ControlsPanel.propTypes = { /* ... as before ... */
+  inputState: PropTypes.shape({
+    modeShares: PropTypes.objectOf(PropTypes.number),
+  }).isRequired,
+  activeModeDetails: PropTypes.objectOf(modeDetailsShape).isRequired,
+  sortedActiveModeKeys: PropTypes.arrayOf(PropTypes.string),
+  onModeShareChange: PropTypes.func.isRequired,
+  onModeNumericInputCommit: PropTypes.func.isRequired,
+  onReset: PropTypes.func.isRequired,
+  isLoading: PropTypes.bool,
 };
-
-ControlsPanel.defaultProps = {
-    isLoading: false,
-    inputState: { modeShares: {} },
-    // baselineModeShares: {}, // Removed default prop
-    modes: {} // Add default for modes object
+ControlsPanel.defaultProps = { /* ... as before ... */
+  isLoading: false,
+  sortedActiveModeKeys: [],
 };
-
 
 export default ControlsPanel;

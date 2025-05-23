@@ -1,25 +1,42 @@
-// src/config.js
+// src/config.js - UPDATED for Dynamic Modes
 
-export const API_BASE_URL = 'https://sea-moves-back.onrender.com'; // Your backend URL
+// --- Core API Configuration ---
+// Set this to your backend server address
+export const API_BASE_URL =  'http://127.0.0.1:5001/api';
 
-// **** CHANGE THIS ****
-// Define MODES as an object: { internal_key: "Display Name" }
-// Ensure keys match BASELINE_MODE_SHARES and API keys
+// --- Default Baseline Configuration Values ---
+// These are used by App.jsx if nothing is found in localStorage
+// They DO NOT define the modes themselves anymore.
+export const DEFAULT_PARKING_COST = 5000;
+// Add other non-mode-specific defaults if needed by App.jsx initialization logic
+// export const INITIAL_START_YEAR = 2024; // Example if needed
+// export const INITIAL_NUM_YEARS = 5;    // Example if needed
+
+
+// ========================================================================
+// === OBSOLETE Definitions below - Kept for reference, but REMOVE THEM ===
+// ========================================================================
+
+/*
+// **** REMOVE THIS ****
+// MODES are now fetched dynamically from the `/api/modes/available` endpoint.
+// Keeping this hardcoded list will cause conflicts and inconsistencies.
 export const MODES = {
   "Drive": "Drive",
-  "Light Rail": "Light Rail", // Make sure API uses "Light Rail"
+  "Light Rail": "Light Rail",
   "Bus": "Bus",
-  "Drop-off": "Drop-off",
+  "Drop-off": "Drop-off", // Drop-off is not in the new AVAILABLE_MODES
   "Walk": "Walk",
   "Carpool": "Carpool",
-  "Vanpool": "Vanpool",
+  "Vanpool": "Vanpool", // Vanpool is not in the new AVAILABLE_MODES
   "Bike": "Bike"
-  // If you add Telework or Other, add them here too
-  // "Telework": "Telework",
-  // "Other": "Other",
 };
+*/
 
-// Ensure keys here EXACTLY match the keys in the MODES object above
+/*
+// **** REMOVE THIS ****
+// Baseline mode shares are now initialized in App.jsx based on the
+// `isDefaultActive` flag from the fetched available modes.
 export const BASELINE_MODE_SHARES = {
   "Drive": 71.0,
   "Light Rail": 10.0,
@@ -30,32 +47,35 @@ export const BASELINE_MODE_SHARES = {
   "Vanpool": 1.0,
   "Bike": 1.0
 };
+*/
 
-// Match backend defaults or provide sensible starting points
+/*
+// **** REMOVE THIS ****
+// Population and Parking Supply are now handled dynamically within App.jsx
+// based on the `numYears` setting in the baseline configuration.
+// Keeping these strings here can lead to mismatches.
 export const DEFAULT_POPULATION_STRING = "10000, 10200, 10400, 10600, 10800";
 export const DEFAULT_PARKING_SUPPLY_STRING = "5000, 5100, 5100, 5200, 5200";
-export const DEFAULT_PARKING_COST = 5000;
+*/
 
-// Chart Colors (customize as needed)
-// NOTE: The component using this (ModeShareChart?) will need to iterate
-// over Object.keys(MODES) and use the index to get the color.
-// Ensure the order Object.keys provides is consistent or consider
-// changing this to an object mapping mode keys to colors for robustness.
+/*
+// **** REMOVE OR REFACTOR THIS ****
+// Chart colors should now be driven by the `color` property received
+// for each active mode from the API response (`mode_details_for_display`)
+// or the `activeModeDetails` state derived in App.jsx.
+// Relying on a fixed-order array based on Object.keys is unreliable.
 export const MODE_CHART_COLORS = [
-  // Drive (assuming it's first in Object.keys(MODES))
-  '#d42f2f', // Red (from your comment)
-  // Light Rail
+  '#d42f2f', // Red
   '#FFC107', // Amber
-  // Bus
   '#2196F3', // Blue
-  // Drop-off
   '#9C27B0', // Purple
-  // Walk
   '#FF5722', // Deep Orange
-  // Carpool
   '#795548', // Brown
-  // Vanpool
   '#607D8B', // Blue Grey
-  // Bike
   '#4CAF50', // Green
 ];
+*/
+
+// ========================================================================
+// === End of OBSOLETE Definitions ===
+// ========================================================================

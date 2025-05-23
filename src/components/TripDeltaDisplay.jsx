@@ -1,112 +1,146 @@
-// src/components/TripDeltaDisplay.jsx - COMPLETE CODE with updated icons
-
+// src/components/TripDeltaDisplay.jsx
 import React from 'react';
 import PropTypes from 'prop-types';
 import { Grid, Box, Typography, Paper } from '@mui/material';
 
-// Import Icons
-import DirectionsCarIcon from '@mui/icons-material/DirectionsCar'; // Drive, Carpool, Vanpool, Drop-off?
-import DirectionsBikeIcon from '@mui/icons-material/DirectionsBike'; // Bike
-import DirectionsWalkIcon from '@mui/icons-material/DirectionsWalk'; // Walk
-import CommuteIcon from '@mui/icons-material/Commute'; // General Transit/Commute
-import TramIcon from '@mui/icons-material/Tram'; // Light Rail specific
-import DirectionsBusIcon from '@mui/icons-material/DirectionsBus'; // Bus specific
-import HailIcon from '@mui/icons-material/Hail'; // Drop-off? Or use Car icon?
-import GroupsIcon from '@mui/icons-material/Groups'; // Carpool / Vanpool?
-// import HomeWorkIcon from '@mui/icons-material/HomeWork'; // For Telework/Remote (if added)
-// import CategoryIcon from '@mui/icons-material/Category'; // For 'Other' or fallback (if added)
-import HelpOutlineIcon from '@mui/icons-material/HelpOutline'; // Fallback
+// Import Icons - Ensure all icons you might use are imported
+import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
+import DirectionsBikeIcon from '@mui/icons-material/DirectionsBike';
+import DirectionsWalkIcon from '@mui/icons-material/DirectionsWalk';
+import DirectionsTransitIcon from '@mui/icons-material/DirectionsTransit'; // For TRANSIT
+import HailIcon from '@mui/icons-material/Hail';                     // For DROPOFF
+import GroupsIcon from '@mui/icons-material/Groups';                 // For CARPOOL, VANPOOL
+import TramIcon from '@mui/icons-material/Tram';                     // For TRAIN, SUBWAY, MONORAIL (example)
+import CommuteIcon from '@mui/icons-material/Commute';               // For FERRY (example)
+import EditRoadIcon from '@mui/icons-material/EditRoad';             // For OTHER slots
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';       // Default
 
 // --- Icon Mapping ---
-// **** UPDATE THIS MAP ****
-// Ensure keys here EXACTLY match the keys in your config.js MODES object
+// Keys MUST exactly match the 'key' field from AVAILABLE_MODES in app.py
 const modeIcons = {
-    "Drive": DirectionsCarIcon,
-    "Light Rail": TramIcon,         // Added specific icon
-    "Bus": DirectionsBusIcon,       // Added specific icon
-    "Drop-off": HailIcon,         // Added specific icon (or use DirectionsCarIcon)
-    "Walk": DirectionsWalkIcon,
-    "Carpool": GroupsIcon,        // Added specific icon (or use DirectionsCarIcon)
-    "Vanpool": GroupsIcon,        // Added specific icon (or use DirectionsCarIcon) - Consider different one?
-    "Bike": DirectionsBikeIcon,
-    // "Telework": HomeWorkIcon,    // Example if added
-    // "Other": CategoryIcon,       // Example if added
+    "DRIVE": DirectionsCarIcon,
+    "WALK": DirectionsWalkIcon,
+    "BIKE": DirectionsBikeIcon,
+    "TRANSIT": DirectionsTransitIcon,
+    "DROPOFF": HailIcon,
+    "CARPOOL": GroupsIcon,
+    "VANPOOL": GroupsIcon,
+    "BEV": DirectionsCarIcon,
+    "MOTORCYCLE": DirectionsCarIcon,
+    "MOPED": DirectionsCarIcon,
+    "E_BIKE": DirectionsBikeIcon,
+    "SKATEBOARD": DirectionsBikeIcon,
+    "REGIONAL_TRAIL": DirectionsWalkIcon,
+    "TRAIN": TramIcon,
+    "SUBWAY": TramIcon,
+    "MONORAIL": TramIcon,
+    "FERRY": CommuteIcon,
+    "OTHER_1": EditRoadIcon,
+    "OTHER_2": EditRoadIcon,
+    "DEFAULT": HelpOutlineIcon,
 };
 
 // --- Helper Functions ---
 const formatDelta = (delta) => {
-    // Handle null/undefined explicitly as well as NaN
-    if (delta === null || delta === undefined || typeof delta !== 'number' || isNaN(delta)) {
-        return '-'; // Placeholder for missing/invalid data
+    if (typeof delta !== 'number' || isNaN(delta)) {
+        if (delta === null || delta === undefined) return '-';
+        return '-';
     }
     const roundedDelta = Math.round(delta);
-    // Handle zero separately if desired, otherwise it shows as "0"
     if (roundedDelta === 0) return "0";
-    return roundedDelta > 0 ? `+${roundedDelta}` : `${roundedDelta}`; // Add '+' sign for positive
+    return roundedDelta > 0 ? `+${roundedDelta}` : `${roundedDelta}`;
 };
 
 const getColorForDelta = (delta) => {
-    // Handle null/undefined explicitly
-    if (delta === null || delta === undefined || typeof delta !== 'number' || isNaN(delta) || delta === 0) {
-        return 'text.secondary'; // Neutral color
+    if (typeof delta !== 'number' || isNaN(delta) || delta === 0 || delta === null || delta === undefined) {
+        return 'text.secondary';
     }
-    return delta > 0 ? 'success.main' : 'error.main'; // Green for positive, Red for negative
+    return delta > 0 ? 'success.main' : 'error.main';
 };
+
+// --- Prop type ---
+const modeDetailsShape = PropTypes.shape({
+    key: PropTypes.string.isRequired,
+    name: PropTypes.string.isRequired,
+    color: PropTypes.string.isRequired,
+    flags: PropTypes.object, // You can be more specific if needed
+    // parking_factor_per_person: PropTypes.number, // if used directly by this component
+});
 
 // --- Component Definition ---
-function TripDeltaDisplay({ deltas, modes }) {
+function TripDeltaDisplay({ deltas, activeModeDetails, sortedActiveModeKeys }) {
+  // CRITICAL LOG for receiving sorted keys
+  console.log("[CRITICAL_PROP_LOG] TripDeltaDisplay.jsx - RECEIVED sortedActiveModeKeys:", JSON.stringify(sortedActiveModeKeys));
 
-    const validDeltas = (typeof deltas === 'object' && deltas !== null) ? deltas : {};
-    const validModes = (typeof modes === 'object' && modes !== null) ? modes : {};
-    // Now this gets the correct keys: ["Drive", "Light Rail", ...]
-    const modeKeys = Object.keys(validModes);
+  const keysToIterate = (Array.isArray(sortedActiveModeKeys) && sortedActiveModeKeys.length > 0)
+                        ? sortedActiveModeKeys
+                        : Object.keys(activeModeDetails || {});
+  // CRITICAL LOG for the actual keys being used to map
+  console.log("[CRITICAL_PROP_LOG] TripDeltaDisplay.jsx - keysToIterate (used for .map):", JSON.stringify(keysToIterate));
 
-    if (modeKeys.length === 0) {
-        return <Typography sx={{ p: 2, fontStyle: 'italic' }}>No modes configured.</Typography>;
-    }
+  if (keysToIterate.length === 0) {
+    return <Typography sx={{ p: 2, fontStyle: 'italic', textAlign: 'center' }}>No selected modes or data available to display deltas.</Typography>;
+  }
 
-    return (
-        <Grid container spacing={2} alignItems="stretch">
-            {modeKeys.map((modeKey) => {
-                // Get the display name from the modes object
-                const modeName = validModes[modeKey] || modeKey; // Fallback to key if name missing
-                const deltaValue = validDeltas[modeKey];
-                const formattedValue = formatDelta(deltaValue);
-                const color = getColorForDelta(deltaValue);
-                // Lookup icon using the correct modeKey
-                const IconComponent = modeIcons[modeKey] || HelpOutlineIcon; // Use fallback if key not in map
+  return (
+    <Grid container spacing={2} alignItems="stretch">
+        {keysToIterate.map((modeKey, index) => { // Added 'index'
+            const modeInfo = activeModeDetails[modeKey];
+            if (!modeInfo) {
+                console.warn(`[RENDER_ORDER_DEBUG] TripDeltaDisplay: No modeInfo found for key: ${modeKey} at index ${index}. Skipping render for this item.`);
+                return null; // Skip rendering if modeInfo is missing for a key
+            }
 
-                return (
-                    // Adjust grid sizing based on number of modes if needed
-                    <Grid item xs={6} sm={4} md={3} lg={1.5} key={modeKey}> {/* Example: 8 modes fit well on lg */}
-                        <Paper elevation={1} sx={{ p: 2, textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: 140 }}> {/* Added minHeight */}
-                            <IconComponent sx={{ fontSize: 40, mb: 1, color: 'primary.main' }} />
-                            <Typography variant="body2" sx={{ fontWeight: 'medium', mb: 0.5 }}>
-                                {modeName}
-                            </Typography>
-                            <Typography variant="h6" sx={{ color: color, fontWeight: 'bold', mb: 0.5 }}>
-                                {formattedValue}
-                            </Typography>
-                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                trips/day
-                            </Typography>
-                        </Paper>
-                    </Grid>
-                );
-            })}
-        </Grid>
-    );
+            const modeName = modeInfo.name || modeKey; // Fallback to key if name is missing
+            const deltaValue = (deltas && deltas[modeKey] !== undefined) ? deltas[modeKey] : null;
+            const formattedValue = formatDelta(deltaValue);
+            const color = getColorForDelta(deltaValue);
+            const IconComponent = modeIcons[modeKey] || modeIcons["DEFAULT"];
+
+            // Log the order it *thinks* it's rendering
+            console.log(`[RENDER_ORDER_DEBUG] TripDeltaDisplay: Rendering item ${index + 1} - ${modeKey} - ${modeName}`);
+
+            return (
+                // Adjusted Grid item sizing for potentially 7 items.
+                // xs={6} (2 per row on extra small)
+                // sm={4} (3 per row on small)
+                // md={3} (4 per row on medium)
+                // lg={2} (6 per row on large, will wrap for 7th item)
+                // You might need to adjust these based on your desired layout for 7 items.
+                // Using lg={Math.floor(12 / Math.min(keysToIterate.length, 6))} could be dynamic but complex.
+                // For 7 items, lg={2} means 6 fit, 1 wraps. Or adjust padding/spacing.
+                <Grid item xs={6} sm={4} md={3} lg={2} key={modeKey} >
+                    <Paper elevation={1} sx={{ p: 2, textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: 140 }}>
+                        <IconComponent sx={{ fontSize: 40, mb: 1, color: 'primary.main' }} />
+                                                <Typography variant="body2" sx={{ fontWeight: 'medium', mb: 0.5, wordBreak: 'break-word' }}>
+                            {modeName}
+                        </Typography>
+                        <Typography variant="h6" sx={{ color: color, fontWeight: 'bold', mb: 0.5 }}>
+                            {formattedValue}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                            trips/day
+                        </Typography>
+                    </Paper>
+                </Grid>
+            );
+        })}
+    </Grid>
+  );
 }
 
+// --- PropTypes ---
 TripDeltaDisplay.propTypes = {
-    /** Object containing the calculated delta values for each mode (e.g., { Drive: -50, Bike: 20 }) */
     deltas: PropTypes.object,
-    /** Object mapping mode keys to their display names (e.g., { Drive: 'Drive Alone', Bike: 'Bicycle' }) */
-    modes: PropTypes.object.isRequired,
+    activeModeDetails: PropTypes.objectOf(modeDetailsShape).isRequired,
+    sortedActiveModeKeys: PropTypes.arrayOf(PropTypes.string),
 };
 
+// --- Default Props ---
 TripDeltaDisplay.defaultProps = {
     deltas: {},
+    // activeModeDetails: {}, // It's required, so no default needed if App.jsx always provides it
+    sortedActiveModeKeys: [],
 };
 
 export default TripDeltaDisplay;
