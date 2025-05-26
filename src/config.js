@@ -2,7 +2,7 @@
 
 // --- Core API Configuration ---
 // Set this to your backend server address
-export const API_BASE_URL =  'https://sea-moves-back.onrender.com'|| 'http://127.0.0.1:5001/api';
+export const API_BASE_URL =  'https://sea-moves-back.onrender.com/api'|| 'http://127.0.0.1:5001/api';
 
 // --- Default Baseline Configuration Values ---
 // These are used by App.jsx if nothing is found in localStorage
