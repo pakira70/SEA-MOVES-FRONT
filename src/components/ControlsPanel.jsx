@@ -1,125 +1,182 @@
 // src/components/ControlsPanel.jsx
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { Box, Typography, Slider, TextField, Button, Tooltip, IconButton, Grid } from '@mui/material';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import { Box, Typography, Slider, TextField, Button, Grid } from '@mui/material';
+// import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'; // Not used in current code
 
 const formatDisplayValue = (value) => {
-  if (value === null || value === undefined || isNaN(Number(value))) return '';
+  if (value === null || value === undefined || value === '' || isNaN(Number(value))) return '';
   const num = Number(value);
-  const fixedNum = num.toFixed(1);
-  return String(parseFloat(fixedNum));
+  // If the number is very close to an integer (e.g., 25.000000000004), treat as integer for display
+  // unless the original string value has more precision (e.g. user typed "25.001")
+  const stringValue = String(value);
+  if (Math.abs(num - Math.round(num)) < 0.0001 && (!stringValue.includes('.') || stringValue.endsWith('.0'))) {
+    return String(Math.round(num));
+  }
+  // Preserve user's input precision if they typed it, otherwise, default to a reasonable number of decimals for display
+  // This part is tricky. The slider will often give many decimals.
+  // Let's try to parseFloat to avoid excessive trailing zeros from toFixed if not needed.
+  if (typeof value === 'number') {
+      return String(parseFloat(value.toFixed(2))); // Display with up to 2 decimals from numeric sources
+  }
+  return stringValue; // Keep user's typed string as is for intermediate
 };
 
-const modeDetailsShape = PropTypes.shape({ /* ... */ });
+
+const modeDetailsShape = PropTypes.shape({
+    key: PropTypes.string.isRequired,
+    name: PropTypes.string.isRequired,
+    color: PropTypes.string.isRequired,
+});
+
 
 function ControlsPanel({
   inputState, activeModeDetails, sortedActiveModeKeys,
   onModeShareChange, onModeNumericInputCommit, onReset, isLoading,
 }) {
-  console.log("[CRITICAL_PROP_LOG] ControlsPanel.jsx - RECEIVED sortedActiveModeKeys:", JSON.stringify(sortedActiveModeKeys));
   const [intermediateValues, setIntermediateValues] = useState({});
   const focusedInputRef = useRef(null);
 
   const keysToIterate = useMemo(() => {
-    const result = (Array.isArray(sortedActiveModeKeys) && sortedActiveModeKeys.length > 0)
+    return (Array.isArray(sortedActiveModeKeys) && sortedActiveModeKeys.length > 0)
                     ? sortedActiveModeKeys : Object.keys(activeModeDetails || {});
-    console.log("[CRITICAL_PROP_LOG] ControlsPanel.jsx - keysToIterate (used for .map):", JSON.stringify(result));
-    return result;
   }, [sortedActiveModeKeys, activeModeDetails]);
 
   useEffect(() => {
-    // Sync intermediateValues with inputState.modeShares when props change,
-    // but respect focused input.
-    const newIntermediate = {};
+    const newIntermediateLocal = {};
     let needsUpdate = false;
+    const currentInputModeShares = inputState.modeShares || {};
+
     keysToIterate.forEach(modeKey => {
-      const appShare = inputState.modeShares[modeKey];
-      const formattedAppShare = formatDisplayValue(appShare ?? 0);
-      if (focusedInputRef.current === modeKey) {
-        // If focused, keep the user's current typing in intermediateValues
-        newIntermediate[modeKey] = intermediateValues[modeKey] !== undefined ? intermediateValues[modeKey] : formattedAppShare;
-      } else {
-        newIntermediate[modeKey] = formattedAppShare;
-      }
-      if (intermediateValues[modeKey] !== newIntermediate[modeKey]) {
-        needsUpdate = true;
-      }
+        const appShareNum = Number(currentInputModeShares[modeKey] ?? 0);
+        const formattedAppShareForDisplay = formatDisplayValue(appShareNum);
+
+        if (focusedInputRef.current === modeKey) {
+            // If focused, ensure the value exists; if not, initialize from app state
+            newIntermediateLocal[modeKey] = intermediateValues[modeKey] !== undefined 
+                                       ? intermediateValues[modeKey] 
+                                       : formattedAppShareForDisplay;
+        } else {
+            // If not focused, sync with app state if different
+            // Compare numeric values to avoid loops from string formatting differences (e.g. "25" vs "25.0")
+            const currentIntermediateNum = parseFloat(intermediateValues[modeKey]);
+            if (intermediateValues[modeKey] === undefined || 
+                isNaN(currentIntermediateNum) || 
+                Math.abs(currentIntermediateNum - appShareNum) > 0.001) { // Compare numerically
+                newIntermediateLocal[modeKey] = formattedAppShareForDisplay;
+            } else {
+                // If numbers are effectively the same, but string format is different, prefer app's formatted version
+                // This helps if user typed "25." and app state is 25, it should become "25"
+                if (intermediateValues[modeKey] !== formattedAppShareForDisplay) {
+                    newIntermediateLocal[modeKey] = formattedAppShareForDisplay;
+                } else {
+                    newIntermediateLocal[modeKey] = intermediateValues[modeKey]; // Keep existing if no change needed
+                }
+            }
+        }
+        if (intermediateValues[modeKey] !== newIntermediateLocal[modeKey]) {
+            needsUpdate = true;
+        }
     });
-    // If the set of keys changed, also mark for update
+    
+    // If keys changed, ensure all are present or absent
     if (Object.keys(intermediateValues).length !== keysToIterate.length) {
         needsUpdate = true;
+        if (keysToIterate.length === 0) { // No active modes, clear all
+            setIntermediateValues({});
+            return;
+        }
+        // Rebuild if keys changed, newIntermediateLocal already respects focus
     }
 
+
     if (needsUpdate) {
-      setIntermediateValues(newIntermediate);
+        setIntermediateValues(newIntermediateLocal);
     }
-  }, [inputState.modeShares, keysToIterate]); // Removed activeModeDetails, covered by keysToIterate
+  }, [inputState.modeShares, keysToIterate]); // Removed intermediateValues from deps
+
 
   const handleSliderChange = useCallback((modeKey, newValue) => {
     if (isLoading) return;
-    // Update intermediateValue for both slider visual and text field
     setIntermediateValues(prev => ({ ...prev, [modeKey]: formatDisplayValue(newValue) }));
-    // NO call to onModeShareChange here for live app state update
   }, [isLoading]);
 
   const handleSliderChangeCommitted = useCallback((modeKey, newValue) => {
     if (isLoading) return;
-    const numericValue = Math.max(0, Math.min(100, Number(newValue))); // Clamp
-    // Ensure intermediate reflects this final clamped value
-    setIntermediateValues(prev => ({ ...prev, [modeKey]: formatDisplayValue(numericValue) }));
-    onModeShareChange(modeKey, numericValue); // Update App.jsx state
+    const numericValue = Number(parseFloat(Number(newValue).toFixed(2)));
+    // setIntermediateValues(prev => ({ ...prev, [modeKey]: formatDisplayValue(numericValue) })); // App.jsx will update inputState, which updates intermediateValues via useEffect
+    onModeShareChange(modeKey, numericValue);
   }, [isLoading, onModeShareChange]);
 
   const handleLocalModeShareTextChange = useCallback((modeKey, event) => {
     if (isLoading) return;
-    setIntermediateValues(prev => ({ ...prev, [modeKey]: event.target.value }));
+    const { value } = event.target;
+    // Allow numbers, a single decimal point, or an empty string
+    if (/^(\d+\.?\d*|\d*\.?\d+|\d*)$/.test(value) || value === '') {
+        setIntermediateValues(prev => ({ ...prev, [modeKey]: value }));
+    }
   }, [isLoading]);
 
   const handleLocalModeShareTextCommit = useCallback((modeKey) => {
-    if (isLoading) {
-      if (focusedInputRef.current === modeKey) focusedInputRef.current = null;
-      return;
+    if (isLoading && focusedInputRef.current === modeKey) {
+        focusedInputRef.current = null;
+        return;
     }
+    if (isLoading) return;
+
     const rawValue = intermediateValues[modeKey];
     let numericValue = parseFloat(rawValue);
 
-    if (isNaN(numericValue)) {
+    if (rawValue === '' || isNaN(numericValue)) {
       numericValue = inputState?.modeShares?.[modeKey] ?? 0;
     }
-    numericValue = Math.max(0, Math.min(100, numericValue)); // Clamp
+    numericValue = Number(parseFloat(Math.max(0, Math.min(100, numericValue)).toFixed(2)));
 
-    setIntermediateValues(prev => ({ ...prev, [modeKey]: formatDisplayValue(numericValue) }));
+    // setIntermediateValues(prev => ({ ...prev, [modeKey]: formatDisplayValue(numericValue) })); // App.jsx will update inputState, which updates intermediateValues via useEffect
     if (focusedInputRef.current === modeKey) focusedInputRef.current = null;
-    onModeNumericInputCommit(modeKey, numericValue); // Update App.jsx state
+    onModeNumericInputCommit(modeKey, numericValue);
   }, [isLoading, intermediateValues, onModeNumericInputCommit, inputState?.modeShares]);
 
-  const currentModeSum = useMemo(() => { /* ... as before ... */
+  const handleKeyDown = useCallback((event, modeKey) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      handleLocalModeShareTextCommit(modeKey);
+      if (event.target && typeof event.target.blur === 'function') {
+        event.target.blur(); // Blur the input after Enter
+      }
+    }
+  }, [handleLocalModeShareTextCommit]);
+
+  const currentModeSum = useMemo(() => {
     let sum = 0;
     if (inputState?.modeShares && activeModeDetails) {
         keysToIterate.forEach(modeKey => {
             sum += Number(inputState.modeShares[modeKey] || 0);
         });
     }
-    return parseFloat(sum.toFixed(1));
+    // Round sum to avoid floating point display issues like 99.999999999997
+    return parseFloat(sum.toFixed(2));
   }, [inputState?.modeShares, activeModeDetails, keysToIterate]);
-
-  useEffect(() => { /* ... [RENDER_ORDER_DEBUG] log as before ... */ });
 
   return (
     <Box>
-      <Typography /* ... */ >Mode Shares (Sum: {currentModeSum}%)</Typography>
+      <Typography variant="h6" component="h3" gutterBottom>
+        Mode Shares (Sum: {currentModeSum}%)
+      </Typography>
       <Grid container spacing={2} sx={{ mb: 3 }}>
         {keysToIterate.map((modeKey) => {
           const modeInfo = activeModeDetails[modeKey];
           if (!modeInfo) return null;
 
-          // Slider value should now come from intermediateValues for responsiveness,
-          // falling back to app state if intermediate isn't set.
-          const liveValueString = intermediateValues[modeKey] !== undefined 
-                                 ? intermediateValues[modeKey] 
+          const liveValueString = intermediateValues[modeKey] !== undefined
+                                 ? intermediateValues[modeKey]
                                  : formatDisplayValue(inputState?.modeShares?.[modeKey] ?? 0);
-          const liveNumericValue = Number(liveValueString || 0);
+          
+          // Slider needs a number. If intermediate is empty string or invalid, default to 0 for slider.
+          let liveNumericValueForSlider = parseFloat(liveValueString);
+          if (isNaN(liveNumericValueForSlider)) {
+              liveNumericValueForSlider = 0;
+          }
 
           const modeDisplayName = modeInfo.name || modeKey;
 
@@ -130,13 +187,13 @@ function ControlsPanel({
                   <Typography component="label" htmlFor={`${modeKey}-input`} sx={{ minWidth: '80px', textAlign: 'right', mr:1, fontSize: '0.875rem' }}>{modeDisplayName}:</Typography>
                   <TextField
                     id={`${modeKey}-input`}
-                    value={liveValueString} // Driven by intermediateValues
+                    value={liveValueString}
                     onChange={(e) => handleLocalModeShareTextChange(modeKey, e)}
                     onFocus={() => focusedInputRef.current = modeKey}
                     onBlur={() => { if (focusedInputRef.current === modeKey) handleLocalModeShareTextCommit(modeKey); }}
-                    onKeyDown={(e) => { /* ... as before ... */ }}
+                    onKeyDown={(e) => handleKeyDown(e, modeKey)}
                     type="text"
-                    inputProps={{ style: { textAlign: 'right', paddingRight: '4px' }, maxLength: 5 }}
+                    inputProps={{ style: { textAlign: 'right', paddingRight: '4px' }, maxLength: 6 }}
                     sx={{ width: '70px' }}
                     size="small"
                     disabled={isLoading}
@@ -144,17 +201,21 @@ function ControlsPanel({
                   <Typography sx={{ml: 0.5}}>%</Typography>
                 </Box>
                 <Slider
-                  value={liveNumericValue} // Driven by intermediateValues (converted to number)
-                  onChange={(e, val) => handleSliderChange(modeKey, val)} // Updates intermediateValues
-                  onChangeCommitted={(e, val) => handleSliderChangeCommitted(modeKey, val)} // Updates App.jsx state
+                  value={liveNumericValueForSlider} // Use the explicitly parsed number
+                  onChange={(e, val) => handleSliderChange(modeKey, val)}
+                  onChangeCommitted={(e, val) => handleSliderChangeCommitted(modeKey, val)}
                   aria-labelledby={`${modeKey}-slider-label`}
                   valueLabelDisplay="off"
                   step={0.1} min={0} max={100}
                   disabled={isLoading}
                   sx={{
-                    color: 'primary.main',
-                    '& .MuiSlider-thumb': { width: 12, height: 12, marginTop: '-1px' }, // Item 2: Centering (12h thumb on 4h track)
-                                                                                      // If track height is 6px, marginTop: -3px
+                    color: modeInfo.color || 'primary.main', // Use mode color for slider
+                    '& .MuiSlider-thumb': { 
+                        width: 12, 
+                        height: 12, 
+                        marginTop: '-1px', // For 4px track height
+                        // backgroundColor: 'currentColor', // Not needed if color prop above works
+                    }, 
                     '& .MuiSlider-track': { height: 4 },
                     '& .MuiSlider-rail': { height: 4 },
                   }}
@@ -172,7 +233,7 @@ function ControlsPanel({
   );
 }
 
-ControlsPanel.propTypes = { /* ... as before ... */
+ControlsPanel.propTypes = {
   inputState: PropTypes.shape({
     modeShares: PropTypes.objectOf(PropTypes.number),
   }).isRequired,
@@ -183,7 +244,7 @@ ControlsPanel.propTypes = { /* ... as before ... */
   onReset: PropTypes.func.isRequired,
   isLoading: PropTypes.bool,
 };
-ControlsPanel.defaultProps = { /* ... as before ... */
+ControlsPanel.defaultProps = {
   isLoading: false,
   sortedActiveModeKeys: [],
 };
