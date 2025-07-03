@@ -1,12 +1,10 @@
-// src/App.jsx
+// src/App.jsx - REFACTORED FOR NEW API PAYLOAD
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-// Removed PropTypes import as it's not explicitly used in App.jsx itself after ModelSetupPage simplification
-// import PropTypes from 'prop-types';
 import axios from 'axios';
 import { Routes, Route, NavLink } from 'react-router-dom';
 import {
   Container, Typography, Box, AppBar, Toolbar, Button,
-  CssBaseline, ThemeProvider, createTheme, CircularProgress, Alert, Link // Added Link for potential use in footer
+  CssBaseline, ThemeProvider, createTheme, CircularProgress, Alert, Link
 } from '@mui/material';
 
 import ScenarioPage from './pages/ScenarioPage.jsx';
@@ -15,11 +13,11 @@ import { API_BASE_URL, DEFAULT_PARKING_COST } from './config';
 
 const theme = createTheme({
   palette: {
-    primary: { main: '#1976D2' }, // Blue primary color
+    primary: { main: '#1976D2' },
     secondary: { main: '#ffc107' },
     background: { 
-      default: '#f5f5f5', // Light grey background for the page
-      paper: '#ffffff' // White background for Paper components (like the footer)
+      default: '#f5f5f5',
+      paper: '#ffffff'
     }
   },
   typography: { fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif' },
@@ -30,16 +28,11 @@ const FALLBACK_NUM_YEARS = 5;
 const FALLBACK_POPULATION = 10000;
 const FALLBACK_PARKING_SUPPLY = 5000;
 
-
 function App() {
-  // console.log("App Component: Mounting/Rendering");
-
-  // --- State for Available Modes & Initial Setup ---
   const [modesLoading, setModesLoading] = useState(true);
   const [modesError, setModesError] = useState(null);
   const [availableModes, setAvailableModes] = useState([]);
 
-  // --- State for App Configuration (Baseline edited on ModelSetupPage) ---
   const [appConfig, setAppConfig] = useState({
     startYear: FALLBACK_START_YEAR,
     numYears: FALLBACK_NUM_YEARS,
@@ -48,16 +41,18 @@ function App() {
     quickStartPopulation: FALLBACK_POPULATION,
     quickAnnualGrowthRate: 0,
     quickStartParkingSupply: FALLBACK_PARKING_SUPPLY,
+    includeShuttleCosts: false,
+    shuttleBaselineCost: 12000000,
+    shuttleParkingPercentage: 50,
+    shuttleCostPerHour: 100,
+    shuttlePeakHours: 3,
+    shuttleVehicleCapacity: 30,
+    shuttleMinContractHours: 4,
+    shuttleOperatingDays: 280,
   });
 
   const [intermediateNumberInputs, setIntermediateNumberInputs] = useState({
-    startYear: String(appConfig.startYear),
-    numYears: String(appConfig.numYears),
-    showRate: String(appConfig.showRate),
-    defaultParkingCost: String(appConfig.defaultParkingCost),
-    quickStartPopulation: String(appConfig.quickStartPopulation),
-    quickAnnualGrowthRate: String(appConfig.quickAnnualGrowthRate),
-    quickStartParkingSupply: String(appConfig.quickStartParkingSupply),
+    ...Object.fromEntries(Object.entries(appConfig).map(([key, value]) => [key, String(value)]))
   });
 
   const [activeModeSelection, setActiveModeSelection] = useState({});
@@ -72,9 +67,6 @@ function App() {
   });
 
   const [baselineApiResponseData, setBaselineApiResponseData] = useState(null);
-  const [isBaselineLoading, setIsBaselineLoading] = useState(false);
-  const [baselineError, setBaselineError] = useState(null);
-
   const [apiResponseData, setApiResponseData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [interactiveError, setInteractiveError] = useState(null);
@@ -108,18 +100,87 @@ function App() {
     if (!currentActiveDetails || Object.keys(currentActiveDetails).length === 0 || !currentBaselineShares || Object.keys(currentBaselineShares).length === 0) {
       return [];
     }
-    const activeKeysInput = Object.keys(currentActiveDetails);
-    const keysToSort = [...activeKeysInput];
-    const sortedResult = keysToSort.sort((keyA, keyB) => {
-      const shareA = currentBaselineShares[keyA];
-      const shareB = currentBaselineShares[keyB];
-      const numShareA = (typeof shareA === 'number' && !isNaN(shareA)) ? shareA : 0;
-      const numShareB = (typeof shareB === 'number' && !isNaN(shareB)) ? shareB : 0;
-      if (numShareB === numShareA) return keyA.localeCompare(keyB);
-      return numShareB - numShareA;
-    });
-    return sortedResult;
+    const keysToSort = [...Object.keys(currentActiveDetails)];
+    keysToSort.sort((keyA, keyB) => (currentBaselineShares[keyB] ?? 0) - (currentBaselineShares[keyA] ?? 0) || keyA.localeCompare(keyB));
+    return keysToSort;
   }, [activeModeDetails, baselineModeShares]);
+
+  // --- NEW UNIFIED API CALL FUNCTION ---
+  const fetchCalculations = useCallback(async (currentInputState, currentAppConfig, currentBaselineShares) => {
+    if (Object.keys(currentBaselineShares).length === 0 || !currentAppConfig) return;
+    setIsLoading(true);
+    setInteractiveError(null);
+
+    // --- Build BASELINE parameters ---
+    const baselinePopulation = Array(currentAppConfig.numYears).fill(currentAppConfig.quickStartPopulation);
+    if (currentAppConfig.quickAnnualGrowthRate !== 0) {
+      for (let i = 1; i < currentAppConfig.numYears; i++) {
+        baselinePopulation[i] = baselinePopulation[i-1] * (1 + currentAppConfig.quickAnnualGrowthRate / 100);
+      }
+    }
+    const baselineParking = Array(currentAppConfig.numYears).fill(currentAppConfig.quickStartParkingSupply);
+    const baselineInputParameters = {
+        modeShares: currentBaselineShares,
+        population_per_year: baselinePopulation,
+        parking_supply_per_year: baselineParking,
+        parking_cost_per_space: currentAppConfig.defaultParkingCost,
+        show_rate_percent: currentAppConfig.showRate,
+        num_years: currentAppConfig.numYears,
+    };
+
+    // --- Build SCENARIO parameters ---
+    const scenarioInputParameters = {
+        modeShares: currentInputState.modeShares,
+        population_per_year: currentInputState.populationValues,
+        parking_supply_per_year: currentInputState.parkingSupplyValues,
+        parking_cost_per_space: currentInputState.parkingCost,
+        show_rate_percent: currentAppConfig.showRate,
+        num_years: currentAppConfig.numYears,
+    };
+    
+    // --- Build SHUTTLE parameters ---
+    const shuttleParameters = {
+        includeShuttleCosts: currentAppConfig.includeShuttleCosts,
+        shuttleBaselineCost: currentAppConfig.shuttleBaselineCost,
+        shuttleParkingPercentage: currentAppConfig.shuttleParkingPercentage,
+        shuttleCostPerHour: currentAppConfig.shuttleCostPerHour,
+        shuttlePeakHours: currentAppConfig.shuttlePeakHours,
+        shuttleVehicleCapacity: currentAppConfig.shuttleVehicleCapacity,
+        shuttleMinContractHours: currentAppConfig.shuttleMinContractHours,
+        shuttleOperatingDays: currentAppConfig.shuttleOperatingDays,
+    };
+
+    const payload = {
+        baselineInputParameters,
+        scenarioInputParameters,
+        shuttleParameters,
+        modeCustomizations,
+    };
+
+    try {
+        const response = await axios.post(`${API_BASE_URL}/calculate`, payload);
+        const { baselineResults, scenarioResults, shuttleResults } = response.data;
+
+        // Attach shuttle results to their respective data objects for easier prop passing
+        baselineResults.shuttle = {
+            annual_cost_per_year: shuttleResults.baseline_annual_cost_per_year,
+            total_shuttles_per_year: shuttleResults.baseline_shuttles_per_year
+        };
+        scenarioResults.shuttle = {
+            annual_cost_per_year: shuttleResults.scenario_annual_cost_per_year,
+            total_shuttles_per_year: shuttleResults.scenario_shuttles_per_year
+        };
+
+        setBaselineApiResponseData(baselineResults);
+        setApiResponseData(scenarioResults);
+
+    } catch (err) {
+        setInteractiveError(err.response?.data?.error || err.message || "An unknown error occurred.");
+    } finally {
+        setIsLoading(false);
+    }
+  }, [modeCustomizations]);
+
 
   useEffect(() => {
     const fetchInitialModes = async () => {
@@ -128,19 +189,12 @@ function App() {
         const response = await axios.get(`${API_BASE_URL}/modes/available`);
         const modesData = response.data;
         setAvailableModes(modesData);
-        const iActiveSel = {}, iCustom = {}, iBaseShares = {}; let sumDef = 0;
+        const iActiveSel = {}, iCustom = {}, iBaseShares = {};
         modesData.forEach(m => {
           iActiveSel[m.key] = m.isDefaultActive || false;
           iBaseShares[m.key] = m.isDefaultActive ? (m.defaultBaselineShare || 0) : 0;
-          if (m.isDefaultActive) sumDef += (m.defaultBaselineShare || 0);
           iCustom[m.key] = { name: m.defaultName, color: m.defaultColor };
         });
-        if (sumDef > 0 && Math.abs(sumDef - 100) > 0.01) {
-            const activeDefaultKeys = modesData.filter(m => m.isDefaultActive).map(m => m.key);
-            activeDefaultKeys.forEach(key => {
-                if (iBaseShares[key] !== undefined) iBaseShares[key] = (iBaseShares[key] / sumDef) * 100;
-            });
-        }
         setActiveModeSelection(iActiveSel);
         setModeCustomizations(iCustom);
         setBaselineModeShares(iBaseShares);
@@ -156,156 +210,42 @@ function App() {
 
   useEffect(() => {
     setIntermediateNumberInputs({
-        startYear: String(appConfig.startYear),
-        numYears: String(appConfig.numYears),
-        showRate: String(appConfig.showRate),
-        defaultParkingCost: String(appConfig.defaultParkingCost),
-        quickStartPopulation: String(appConfig.quickStartPopulation),
-        quickAnnualGrowthRate: String(appConfig.quickAnnualGrowthRate),
-        quickStartParkingSupply: String(appConfig.quickStartParkingSupply),
+      ...Object.fromEntries(Object.entries(appConfig).map(([key, value]) => [key, String(value)]))
     });
   }, [appConfig]);
 
-  const fetchBaselineData = useCallback(async (currentAppConfig) => {
-    if (Object.keys(baselineModeShares).length === 0 || Object.keys(activeModeDetails).length === 0 || !currentAppConfig) return;
-    setIsBaselineLoading(true); setBaselineError(null);
-    const currentActiveKeys = Object.keys(activeModeSelection).filter(key => activeModeSelection[key]);
-    if (currentActiveKeys.length === 0) { setIsBaselineLoading(false); return; }
-    const filteredShares = {}; currentActiveKeys.forEach(k => { filteredShares[k] = baselineModeShares[k] ?? 0; });
-    let baselinePopulationValues = Array(currentAppConfig.numYears).fill(currentAppConfig.quickStartPopulation);
-    if (currentAppConfig.quickAnnualGrowthRate !== 0) {
-        for (let i = 1; i < currentAppConfig.numYears; i++) {
-            baselinePopulationValues[i] = baselinePopulationValues[i-1] * (1 + currentAppConfig.quickAnnualGrowthRate / 100);
-        }
-    }
-    const baselineParkingSupplyValues = Array(currentAppConfig.numYears).fill(currentAppConfig.quickStartParkingSupply);
-    const payload = {
-      activeModeKeys: currentActiveKeys, modeCustomizations,
-      inputParameters: {
-        modeShares: filteredShares,
-        population_per_year: baselinePopulationValues.slice(0, currentAppConfig.numYears),
-        parking_supply_per_year: baselineParkingSupplyValues.slice(0, currentAppConfig.numYears),
-        parking_cost_per_space: currentAppConfig.defaultParkingCost, show_rate_percent: currentAppConfig.showRate,
-        num_years: currentAppConfig.numYears,
-      }
-    };
-    try {
-      const response = await axios.post(`${API_BASE_URL}/calculate`, payload);
-      setBaselineApiResponseData(response.data);
-    } catch (err) {setBaselineError(err.response?.data?.error || err.message);}
-    finally { setIsBaselineLoading(false); }
-  }, [ activeModeDetails, activeModeSelection, baselineModeShares, modeCustomizations ]);
-
-  const fetchData = useCallback(async (currentInputStateForFetch, currentAppConfig) => {
-    if (Object.keys(currentInputStateForFetch.modeShares).length === 0 || Object.keys(activeModeDetails).length === 0 || !currentAppConfig) return;
-    setIsLoading(true); setInteractiveError(null);
-    const currentActiveKeys = Object.keys(activeModeSelection).filter(key => activeModeSelection[key]);
-    if (currentActiveKeys.length === 0) { setIsLoading(false); return; }
-    const filteredShares = {}; currentActiveKeys.forEach(k => {filteredShares[k] = currentInputStateForFetch.modeShares[k] ?? 0; });
-    const payload = {
-      activeModeKeys: currentActiveKeys, modeCustomizations,
-      inputParameters: {
-        modeShares: filteredShares,
-        population_per_year: currentInputStateForFetch.populationValues.slice(0, currentAppConfig.numYears),
-        parking_supply_per_year: currentInputStateForFetch.parkingSupplyValues.slice(0, currentAppConfig.numYears),
-        parking_cost_per_space: currentInputStateForFetch.parkingCost, show_rate_percent: currentAppConfig.showRate,
-        num_years: currentAppConfig.numYears,
-      }
-    };
-    try {
-      const response = await axios.post(`${API_BASE_URL}/calculate`, payload);
-      setApiResponseData(response.data);
-    } catch (err) { setInteractiveError(err.response?.data?.error || err.message); }
-    finally { setIsLoading(false); }
-  }, [ activeModeDetails, activeModeSelection, modeCustomizations ]);
-
-  const stringifiedInitialModeShares = JSON.stringify(inputState.modeShares);
+  // Effect to run calculations when core data is ready or changes
   useEffect(() => {
-    if (!modesLoading && !modesError && availableModes.length > 0 &&
-        Object.keys(baselineModeShares).length > 0 && Object.keys(inputState.modeShares).length > 0 &&
-        !baselineApiResponseData ) {
-      fetchBaselineData(appConfig);
-      fetchData(inputState, appConfig);
+    if (!modesLoading && Object.keys(baselineModeShares).length > 0) {
+      fetchCalculations(inputState, appConfig, baselineModeShares);
     }
-  }, [modesLoading, modesError, availableModes, baselineModeShares, stringifiedInitialModeShares,
-      baselineApiResponseData, fetchBaselineData, fetchData, inputState, appConfig]);
+  }, [modesLoading, inputState, appConfig, baselineModeShares, fetchCalculations]);
 
-  const stringifiedInputModeSharesForEffect = JSON.stringify(inputState.modeShares);
-  const stringifiedInputPopulationValues = JSON.stringify(inputState.populationValues);
-  const stringifiedInputParkingSupplyValues = JSON.stringify(inputState.parkingSupplyValues);
-  const inputParkingCostForEffect = inputState.parkingCost;
-  useEffect(() => {
-    if (modesLoading || !baselineApiResponseData) return;
-    fetchData(inputState, appConfig);
-  }, [ stringifiedInputModeSharesForEffect, stringifiedInputPopulationValues, stringifiedInputParkingSupplyValues,
-      inputParkingCostForEffect, fetchData, modesLoading, baselineApiResponseData, inputState, appConfig ]);
-
+  // --- Handlers ---
   const handleBaselineNumberInputChange = useCallback((event) => {
       const { name, value } = event.target;
       setIntermediateNumberInputs(prev => ({ ...prev, [name]: value }));
   }, []);
 
+  // Handler for custom number format component
+  const handleBaselineFormattedNumberChange = useCallback((payload) => {
+    const {name, value} = payload.target;
+    setIntermediateNumberInputs(prev => ({ ...prev, [name]: value }));
+  }, []);
+
   const handleBaselineNumberCommit = useCallback((event) => {
       const { name, value } = event.target;
-      let numericValue = parseFloat(value);
-      if (name === "numYears" && (isNaN(numericValue) || numericValue <= 0 || numericValue > 50)) {
-          setIntermediateNumberInputs(prev => ({ ...prev, [name]: String(appConfig[name] || FALLBACK_NUM_YEARS) }));
-          return;
+      let numericValue = parseFloat(String(value).replace(/[$,]/g, ''));
+      if (isNaN(numericValue)) {
+        numericValue = appConfig[name] || 0;
       }
-      if (name === "startYear" && (isNaN(numericValue) || numericValue < 1900 || numericValue > 2200)) {
-          setIntermediateNumberInputs(prev => ({ ...prev, [name]: String(appConfig[name] || FALLBACK_START_YEAR) }));
-          return;
-      }
-      if (!isNaN(numericValue)) {
-          setAppConfig(prevAppConfig => {
-              const newConfig = { ...prevAppConfig, [name]: numericValue };
-              let populationValuesUpdated = false;
-              let parkingSupplyValuesUpdated = false;
-              let newPopulationValues = [...inputState.populationValues];
-              let newParkingSupplyValues = [...inputState.parkingSupplyValues];
-              if (name === 'numYears' && numericValue !== prevAppConfig.numYears) {
-                  const currentQuickStartPop = newConfig.quickStartPopulation;
-                  const currentGrowthRate = newConfig.quickAnnualGrowthRate;
-                  const currentQuickStartParking = newConfig.quickStartParkingSupply;
-                  newPopulationValues = Array(numericValue).fill(currentQuickStartPop);
-                  if (currentGrowthRate !== 0) {
-                      for (let i = 1; i < numericValue; i++) {
-                          newPopulationValues[i] = newPopulationValues[i-1] * (1 + currentGrowthRate / 100);
-                      }
-                  }
-                  newParkingSupplyValues = Array(numericValue).fill(currentQuickStartParking);
-                  populationValuesUpdated = true; parkingSupplyValuesUpdated = true;
-              } else if (name === 'quickStartPopulation' || name === 'quickAnnualGrowthRate') {
-                  const currentNumYears = newConfig.numYears;
-                  const currentQuickStartPop = name === 'quickStartPopulation' ? numericValue : newConfig.quickStartPopulation;
-                  const currentGrowthRate = name === 'quickAnnualGrowthRate' ? numericValue : newConfig.quickAnnualGrowthRate;
-                  newPopulationValues = Array(currentNumYears).fill(currentQuickStartPop);
-                  if (currentGrowthRate !== 0) {
-                      for (let i = 1; i < currentNumYears; i++) {
-                          newPopulationValues[i] = newPopulationValues[i-1] * (1 + currentGrowthRate / 100);
-                      }
-                  }
-                  populationValuesUpdated = true;
-              } else if (name === 'quickStartParkingSupply') {
-                  const currentNumYears = newConfig.numYears;
-                  newParkingSupplyValues = Array(currentNumYears).fill(numericValue);
-                  parkingSupplyValuesUpdated = true;
-              }
-              if (populationValuesUpdated || parkingSupplyValuesUpdated) {
-                setInputState(prevInput => ({
-                    ...prevInput,
-                    ...(populationValuesUpdated && { populationValues: newPopulationValues }),
-                    ...(parkingSupplyValuesUpdated && { parkingSupplyValues: newParkingSupplyValues }),
-                    ...(name === 'defaultParkingCost' && { parkingCost: numericValue }),
-                }));
-              }
-              fetchBaselineData(newConfig);
-              return newConfig;
-          });
-      } else {
-          setIntermediateNumberInputs(prev => ({ ...prev, [name]: String(appConfig[name] || '') }));
-      }
-  }, [appConfig, inputState.populationValues, inputState.parkingSupplyValues, fetchBaselineData]);
+      setAppConfig(prevAppConfig => ({ ...prevAppConfig, [name]: numericValue }));
+  }, [appConfig]);
+
+  const handleBaselineCheckboxChange = useCallback((event) => {
+    const { name, checked } = event.target;
+    setAppConfig(prevAppConfig => ({ ...prevAppConfig, [name]: checked }));
+  }, []);
 
   const handleModeShareChange = useCallback((modeKey, newShareRaw) => {
     const newShare = parseFloat(newShareRaw);
@@ -324,11 +264,10 @@ function App() {
             otherActiveKeys.forEach(k => { totalOtherSharesOriginal += (currentShares[k] || 0); });
             if (totalOtherSharesOriginal > 0) {
                 otherActiveKeys.forEach(k => {
-                    const originalOtherShare = currentShares[k] || 0;
-                    let reduction = (originalOtherShare / totalOtherSharesOriginal) * changeInThisMode;
-                    newShares[k] = Math.max(0, originalOtherShare - reduction);
+                    const reduction = (currentShares[k] / totalOtherSharesOriginal) * changeInThisMode;
+                    newShares[k] = Math.max(0, currentShares[k] - reduction);
                 });
-            } else if (changeInThisMode < 0 && otherActiveKeys.length > 0) {
+            } else if (changeInThisMode < 0) {
                 const shareToAdd = -changeInThisMode / otherActiveKeys.length;
                 otherActiveKeys.forEach(k => { newShares[k] = (newShares[k] || 0) + shareToAdd; });
             }
@@ -336,20 +275,8 @@ function App() {
         let currentTotal = 0;
         activeKeys.forEach(k => currentTotal += (newShares[k] || 0));
         if (Math.abs(currentTotal - 100) > 0.001 && currentTotal > 0) {
-            activeKeys.forEach(k => { newShares[k] = ((newShares[k] || 0) / currentTotal) * 100; });
+            activeKeys.forEach(k => { newShares[k] = (newShares[k] / currentTotal) * 100; });
         }
-        let roundedTotal = 0;
-        activeKeys.forEach(k => {
-            newShares[k] = Math.round((newShares[k] || 0) * 100) / 100;
-            roundedTotal += newShares[k];
-        });
-        if (activeKeys.length > 0 && Math.abs(roundedTotal - 100) > 0.001) {
-            const diff = 100 - roundedTotal;
-            const keyToAdjust = newShares[modeKey] !== undefined ? modeKey : activeKeys[0];
-            newShares[keyToAdjust] = (newShares[keyToAdjust] || 0) + diff;
-            newShares[keyToAdjust] = Math.round(newShares[keyToAdjust] * 100) / 100;
-        }
-        activeKeys.forEach(k => { if (newShares[k] < 0) newShares[k] = 0; });
         return { ...prevState, modeShares: newShares };
     });
   }, [activeModeSelection]);
@@ -366,131 +293,56 @@ function App() {
         }
     }
     const resetParkingValues = Array(appConfig.numYears).fill(appConfig.quickStartParkingSupply);
-    const resetInputStateValues = {
+    setInputState({
       modeShares: { ...baselineModeShares },
       populationValues: resetPopulationValues,
       parkingSupplyValues: resetParkingValues,
       parkingCost: appConfig.defaultParkingCost,
-    };
-    setInputState(resetInputStateValues);
+    });
   }, [baselineModeShares, appConfig]);
 
-  // Stubs for deferred advanced setup handlers
-  const handleBaselineModeSelectionChange = useCallback(() => {}, []);
-  const handleBaselineModeShareValueChange = useCallback(() => {}, []);
-  const handleModeCustomizationChange = useCallback(() => {}, []);
-
-  if (modesLoading) {
-    return ( <ThemeProvider theme={theme}><CssBaseline /><Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}><CircularProgress /><Typography ml={2}>Loading Mode Configuration...</Typography></Box></ThemeProvider> );
-  }
-  if (modesError) {
-    return ( <ThemeProvider theme={theme}><CssBaseline /><Container maxWidth="sm" sx={{ mt: 5 }}><Alert severity="error">Error loading application: {modesError}. Please check API and refresh.</Alert></Container></ThemeProvider> );
-  }
+  if (modesLoading) { return ( <ThemeProvider theme={theme}><CssBaseline /><Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}><CircularProgress /><Typography ml={2}>Loading Mode Configuration...</Typography></Box></ThemeProvider> ); }
+  if (modesError) { return ( <ThemeProvider theme={theme}><CssBaseline /><Container maxWidth="sm" sx={{ mt: 5 }}><Alert severity="error">Error loading application: {modesError}. Please check API and refresh.</Alert></Container></ThemeProvider> ); }
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      {/* Outermost Box for sticky footer structure */}
-      <Box 
-        sx={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          minHeight: '100vh' 
-        }}
-      >
-        {/* AppBar */}
-        <AppBar 
-          position="static" 
-          sx={{ 
-            mb: 3, 
-            bgcolor: theme.palette.primary.main,
-            flexShrink: 0 // Prevent AppBar from shrinking
-          }}
-        >
+      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+        <AppBar position="static" sx={{ mb: 3, bgcolor: theme.palette.primary.main, flexShrink: 0 }}>
           <Toolbar>
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>SEA MOVES</Typography>
-            <Button component={NavLink} to="/" style={({ isActive }) => ({ color: 'white', fontWeight: isActive ? 'bold' : 'normal', marginRight: '15px' })}>Scenario Tool</Button>
-            <Button component={NavLink} to="/setup" style={({ isActive }) => ({ color: 'white', fontWeight: isActive ? 'bold' : 'normal', marginRight: '15px' })}>Model Setup</Button>
+            <Button component={NavLink} to="/" style={({ isActive }) => ({ color: 'white', fontWeight: isActive ? 'bold' : 'normal' })}>Scenario Tool</Button>
+            <Button component={NavLink} to="/setup" style={({ isActive }) => ({ color: 'white', fontWeight: isActive ? 'bold' : 'normal' })}>Model Setup</Button>
           </Toolbar>
         </AppBar>
-
-        {/* Main Content Area + Footer (Option 3: Footer INSIDE main content's Container) */}
-        <Container 
-          maxWidth="xl" 
-          component="main" // Semantic tag for main content
-          sx={{ 
-            flexGrow: 1, // Allows this container to grow
-            display: 'flex', // Use flex to manage children (Routes content + Footer)
-            flexDirection: 'column', // Stack Routes content and Footer vertically
-            py: 2 // Vertical padding for the content area
-          }}
-        >
-          {/* This Box will wrap the Routes and allow it to grow, pushing the footer within this Container */}
+        <Container maxWidth="xl" component="main" sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', py: 2 }}>
           <Box sx={{ flexGrow: 1 }}>
             <Routes>
               <Route path="/" element={
                   <ScenarioPage
-                    inputState={inputState}
-                    apiResponseData={apiResponseData}
-                    baselineApiResponseData={baselineApiResponseData}
-                    activeModeDetails={activeModeDetails}
-                    actualYears={actualYears}
-                    sortedActiveModeKeys={sortedActiveModeKeysForDisplay}
-                    isLoading={isLoading}
-                    interactiveError={interactiveError}
-                    baselineIsLoading={isBaselineLoading}
-                    baselineError={baselineError}
-                    onModeShareChange={handleModeShareChange}
-                    onModeNumericInputCommit={handleModeNumericInputCommit}
-                    onReset={handleReset}
+                    inputState={inputState} apiResponseData={apiResponseData} baselineApiResponseData={baselineApiResponseData}
+                    activeModeDetails={activeModeDetails} actualYears={actualYears} sortedActiveModeKeys={sortedActiveModeKeysForDisplay}
+                    isLoading={isLoading} interactiveError={interactiveError} baselineIsLoading={isLoading} baselineError={interactiveError} // Simplification: Use main loading/error for both for now
+                    onModeShareChange={handleModeShareChange} onModeNumericInputCommit={handleModeNumericInputCommit} onReset={handleReset}
                   /> } />
               <Route path="/setup" element={
                   <ModelSetupPage
                     baselineConfig={appConfig}
                     intermediateNumberInputs={intermediateNumberInputs}
-                    onBaselineNumberInputChange={handleBaselineNumberInputChange}
+                    onBaselineNumberInputChange={handleBaselineFormattedNumberChange} // Use the new handler for formatted inputs
                     onBaselineNumberCommit={handleBaselineNumberCommit}
+                    onBaselineCheckboxChange={handleBaselineCheckboxChange}
                   /> } />
             </Routes>
           </Box>
-
-          {/* Footer (now inside the main Container) */}
-          <Box 
-            component="footer" 
-            sx={{ 
-              textAlign: 'left', // As per your preference
-              py: 2, 
-              mt: 4, // Margin-top to space it from content above
-              flexShrink: 0, // Prevent footer from shrinking
-              borderTop: '1px solid',
-              borderColor: 'divider',
-              maxWidth: '1400px',
-              // No specific backgroundColor needed if you want it to match Container's background
-              // (which is usually transparent, inheriting from page body or parent Paper)
-              // If you want it to look like a Paper element:
-              // backgroundColor: theme.palette.background.paper, 
-              // boxShadow: theme.shadows[1], // Optional shadow
-            }}
-          >
-            {/* Content of the footer aligns naturally due to parent Container */}
+          <Box component="footer" sx={{ py: 2, mt: 4, flexShrink: 0, borderTop: '1px solid', borderColor: 'divider' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
-              <img 
-                src="/images/NUClogo.png" // Ensure this path is correct (logo in /public/images/NUClogo.png)
-                alt="Nunes-Ueno Consulting Logo" 
-                style={{ height: '30px', marginRight: '15px' }} 
-              />
-              <Typography variant="caption" component="span">
-                © {new Date().getFullYear()} Nunes-Ueno Consulting.
-              </Typography>
-              {/* Example of a link if you want one:
-              <Link href="https://www.nunes-ueno.com" target="_blank" rel="noopener noreferrer" sx={{ml:1}}>
-                  nunes-ueno.com
-              </Link>
-              */}
+              <img src="/images/NUClogo.png" alt="Nunes-Ueno Consulting Logo" style={{ height: '30px', marginRight: '15px' }} />
+              <Typography variant="caption" component="span"> © {new Date().getFullYear()} Nunes-Ueno Consulting. </Typography>
             </Box>
           </Box>
-        </Container> {/* End of Main Content Area + Footer Container */}
-      </Box> {/* End of Outermost Box for sticky footer */}
+        </Container>
+      </Box>
     </ThemeProvider>
   );
 }
