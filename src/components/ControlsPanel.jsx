@@ -1,27 +1,13 @@
-// src/components/ControlsPanel.jsx
+// src/components/ControlsPanel.jsx - UPDATED FOR SMOOTH SLIDER & INTEGER DISPLAY
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { Box, Typography, Slider, TextField, Button, Grid } from '@mui/material';
-// import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'; // Not used in current code
 
-const formatDisplayValue = (value) => {
+// Helper function to format values for display as whole numbers.
+const formatForIntegerDisplay = (value) => {
   if (value === null || value === undefined || value === '' || isNaN(Number(value))) return '';
-  const num = Number(value);
-  // If the number is very close to an integer (e.g., 25.000000000004), treat as integer for display
-  // unless the original string value has more precision (e.g. user typed "25.001")
-  const stringValue = String(value);
-  if (Math.abs(num - Math.round(num)) < 0.0001 && (!stringValue.includes('.') || stringValue.endsWith('.0'))) {
-    return String(Math.round(num));
-  }
-  // Preserve user's input precision if they typed it, otherwise, default to a reasonable number of decimals for display
-  // This part is tricky. The slider will often give many decimals.
-  // Let's try to parseFloat to avoid excessive trailing zeros from toFixed if not needed.
-  if (typeof value === 'number') {
-      return String(parseFloat(value.toFixed(2))); // Display with up to 2 decimals from numeric sources
-  }
-  return stringValue; // Keep user's typed string as is for intermediate
+  return String(Math.round(Number(value)));
 };
-
 
 const modeDetailsShape = PropTypes.shape({
     key: PropTypes.string.isRequired,
@@ -29,12 +15,13 @@ const modeDetailsShape = PropTypes.shape({
     color: PropTypes.string.isRequired,
 });
 
-
 function ControlsPanel({
   inputState, activeModeDetails, sortedActiveModeKeys,
   onModeShareChange, onModeNumericInputCommit, onReset, isLoading,
 }) {
-  const [intermediateValues, setIntermediateValues] = useState({});
+  // NEW: This state holds the LIVE numeric values during user interaction (drag or typing).
+  // It allows for smooth slider movement because it's updated in real-time.
+  const [liveShares, setLiveShares] = useState({});
   const focusedInputRef = useRef(null);
 
   const keysToIterate = useMemo(() => {
@@ -42,81 +29,40 @@ function ControlsPanel({
                     ? sortedActiveModeKeys : Object.keys(activeModeDetails || {});
   }, [sortedActiveModeKeys, activeModeDetails]);
 
+  // This effect syncs our live state with the main app state when it changes.
   useEffect(() => {
-    const newIntermediateLocal = {};
-    let needsUpdate = false;
-    const currentInputModeShares = inputState.modeShares || {};
-
-    keysToIterate.forEach(modeKey => {
-        const appShareNum = Number(currentInputModeShares[modeKey] ?? 0);
-        const formattedAppShareForDisplay = formatDisplayValue(appShareNum);
-
-        if (focusedInputRef.current === modeKey) {
-            // If focused, ensure the value exists; if not, initialize from app state
-            newIntermediateLocal[modeKey] = intermediateValues[modeKey] !== undefined 
-                                       ? intermediateValues[modeKey] 
-                                       : formattedAppShareForDisplay;
-        } else {
-            // If not focused, sync with app state if different
-            // Compare numeric values to avoid loops from string formatting differences (e.g. "25" vs "25.0")
-            const currentIntermediateNum = parseFloat(intermediateValues[modeKey]);
-            if (intermediateValues[modeKey] === undefined || 
-                isNaN(currentIntermediateNum) || 
-                Math.abs(currentIntermediateNum - appShareNum) > 0.001) { // Compare numerically
-                newIntermediateLocal[modeKey] = formattedAppShareForDisplay;
-            } else {
-                // If numbers are effectively the same, but string format is different, prefer app's formatted version
-                // This helps if user typed "25." and app state is 25, it should become "25"
-                if (intermediateValues[modeKey] !== formattedAppShareForDisplay) {
-                    newIntermediateLocal[modeKey] = formattedAppShareForDisplay;
-                } else {
-                    newIntermediateLocal[modeKey] = intermediateValues[modeKey]; // Keep existing if no change needed
-                }
-            }
-        }
-        if (intermediateValues[modeKey] !== newIntermediateLocal[modeKey]) {
-            needsUpdate = true;
-        }
-    });
-    
-    // If keys changed, ensure all are present or absent
-    if (Object.keys(intermediateValues).length !== keysToIterate.length) {
-        needsUpdate = true;
-        if (keysToIterate.length === 0) { // No active modes, clear all
-            setIntermediateValues({});
-            return;
-        }
-        // Rebuild if keys changed, newIntermediateLocal already respects focus
+    // We don't want to overwrite the user's interaction, so we only sync
+    // if no text field is focused. A more advanced version might also track slider drag state.
+    if (!focusedInputRef.current) {
+      setLiveShares(inputState.modeShares || {});
     }
+  }, [inputState.modeShares]);
 
-
-    if (needsUpdate) {
-        setIntermediateValues(newIntermediateLocal);
-    }
-  }, [inputState.modeShares, keysToIterate]); // Removed intermediateValues from deps
-
-
+  // When the slider is dragged, update the live numeric state with the precise value.
   const handleSliderChange = useCallback((modeKey, newValue) => {
     if (isLoading) return;
-    setIntermediateValues(prev => ({ ...prev, [modeKey]: formatDisplayValue(newValue) }));
+    setLiveShares(prev => ({ ...prev, [modeKey]: newValue }));
   }, [isLoading]);
 
+  // When the slider interaction is committed, send the precise value to App.jsx.
   const handleSliderChangeCommitted = useCallback((modeKey, newValue) => {
     if (isLoading) return;
     const numericValue = Number(parseFloat(Number(newValue).toFixed(2)));
-    // setIntermediateValues(prev => ({ ...prev, [modeKey]: formatDisplayValue(numericValue) })); // App.jsx will update inputState, which updates intermediateValues via useEffect
     onModeShareChange(modeKey, numericValue);
   }, [isLoading, onModeShareChange]);
 
+  // When the user types in the text field, update the live numeric state.
   const handleLocalModeShareTextChange = useCallback((modeKey, event) => {
     if (isLoading) return;
     const { value } = event.target;
-    // Allow numbers, a single decimal point, or an empty string
-    if (/^(\d+\.?\d*|\d*\.?\d+|\d*)$/.test(value) || value === '') {
-        setIntermediateValues(prev => ({ ...prev, [modeKey]: value }));
+    if (/^\d*$/.test(value)) { // Only allow whole numbers
+      // Update liveShares with the number, or 0 if the field is empty.
+      const numericValue = value === '' ? 0 : parseInt(value, 10);
+      setLiveShares(prev => ({ ...prev, [modeKey]: numericValue }));
     }
   }, [isLoading]);
 
+  // When the text field is committed, send the number to App.jsx.
   const handleLocalModeShareTextCommit = useCallback((modeKey) => {
     if (isLoading && focusedInputRef.current === modeKey) {
         focusedInputRef.current = null;
@@ -124,39 +70,37 @@ function ControlsPanel({
     }
     if (isLoading) return;
 
-    const rawValue = intermediateValues[modeKey];
-    let numericValue = parseFloat(rawValue);
+    let numericValue = liveShares[modeKey];
 
-    if (rawValue === '' || isNaN(numericValue)) {
-      numericValue = inputState?.modeShares?.[modeKey] ?? 0;
+    if (numericValue === undefined || isNaN(numericValue)) {
+      numericValue = Math.round(inputState?.modeShares?.[modeKey] ?? 0);
     }
-    numericValue = Number(parseFloat(Math.max(0, Math.min(100, numericValue)).toFixed(2)));
+    numericValue = Math.max(0, Math.min(100, numericValue));
 
-    // setIntermediateValues(prev => ({ ...prev, [modeKey]: formatDisplayValue(numericValue) })); // App.jsx will update inputState, which updates intermediateValues via useEffect
     if (focusedInputRef.current === modeKey) focusedInputRef.current = null;
     onModeNumericInputCommit(modeKey, numericValue);
-  }, [isLoading, intermediateValues, onModeNumericInputCommit, inputState?.modeShares]);
+  }, [isLoading, liveShares, onModeNumericInputCommit, inputState?.modeShares]);
 
+  // Handler for the Enter key.
   const handleKeyDown = useCallback((event, modeKey) => {
     if (event.key === 'Enter') {
       event.preventDefault();
       handleLocalModeShareTextCommit(modeKey);
       if (event.target && typeof event.target.blur === 'function') {
-        event.target.blur(); // Blur the input after Enter
+        event.target.blur();
       }
     }
   }, [handleLocalModeShareTextCommit]);
 
   const currentModeSum = useMemo(() => {
     let sum = 0;
-    if (inputState?.modeShares && activeModeDetails) {
-        keysToIterate.forEach(modeKey => {
-            sum += Number(inputState.modeShares[modeKey] || 0);
+    if (inputState?.modeShares) {
+        Object.values(inputState.modeShares).forEach(share => {
+            sum += Number(share || 0);
         });
     }
-    // Round sum to avoid floating point display issues like 99.999999999997
-    return parseFloat(sum.toFixed(2));
-  }, [inputState?.modeShares, activeModeDetails, keysToIterate]);
+    return Math.round(sum);
+  }, [inputState?.modeShares]);
 
   return (
     <Box>
@@ -167,16 +111,10 @@ function ControlsPanel({
         {keysToIterate.map((modeKey) => {
           const modeInfo = activeModeDetails[modeKey];
           if (!modeInfo) return null;
-
-          const liveValueString = intermediateValues[modeKey] !== undefined
-                                 ? intermediateValues[modeKey]
-                                 : formatDisplayValue(inputState?.modeShares?.[modeKey] ?? 0);
           
-          // Slider needs a number. If intermediate is empty string or invalid, default to 0 for slider.
-          let liveNumericValueForSlider = parseFloat(liveValueString);
-          if (isNaN(liveNumericValueForSlider)) {
-              liveNumericValueForSlider = 0;
-          }
+          // The value for both the slider and the text field's display formatting
+          // now comes from our new 'liveShares' state.
+          const liveNumericValue = liveShares[modeKey] ?? 0;
 
           const modeDisplayName = modeInfo.name || modeKey;
 
@@ -187,13 +125,14 @@ function ControlsPanel({
                   <Typography component="label" htmlFor={`${modeKey}-input`} sx={{ minWidth: '80px', textAlign: 'right', mr:1, fontSize: '0.875rem' }}>{modeDisplayName}:</Typography>
                   <TextField
                     id={`${modeKey}-input`}
-                    value={liveValueString}
+                    // The text field displays the ROUNDED version of the live value.
+                    value={formatForIntegerDisplay(liveNumericValue)}
                     onChange={(e) => handleLocalModeShareTextChange(modeKey, e)}
                     onFocus={() => focusedInputRef.current = modeKey}
                     onBlur={() => { if (focusedInputRef.current === modeKey) handleLocalModeShareTextCommit(modeKey); }}
                     onKeyDown={(e) => handleKeyDown(e, modeKey)}
                     type="text"
-                    inputProps={{ style: { textAlign: 'right', paddingRight: '4px' }, maxLength: 6 }}
+                    inputProps={{ style: { textAlign: 'right', paddingRight: '4px' }, maxLength: 3, pattern: "\\d*" }}
                     sx={{ width: '70px' }}
                     size="small"
                     disabled={isLoading}
@@ -201,20 +140,21 @@ function ControlsPanel({
                   <Typography sx={{ml: 0.5}}>%</Typography>
                 </Box>
                 <Slider
-                  value={liveNumericValueForSlider} // Use the explicitly parsed number
+                  // The slider's value is the PRECISE live value, allowing smooth movement.
+                  value={liveNumericValue}
                   onChange={(e, val) => handleSliderChange(modeKey, val)}
                   onChangeCommitted={(e, val) => handleSliderChangeCommitted(modeKey, val)}
                   aria-labelledby={`${modeKey}-slider-label`}
                   valueLabelDisplay="off"
-                  step={0.1} min={0} max={100}
+                  step={1} // Step is 1 for whole number snapping.
+                  min={0} max={100}
                   disabled={isLoading}
                   sx={{
-                    color: modeInfo.color || 'primary.main', // Use mode color for slider
+                    color: modeInfo.color || 'primary.main',
                     '& .MuiSlider-thumb': { 
                         width: 12, 
                         height: 12, 
-                        marginTop: '-1px', // For 4px track height
-                        // backgroundColor: 'currentColor', // Not needed if color prop above works
+                        marginTop: '-1px', // As you fixed.
                     }, 
                     '& .MuiSlider-track': { height: 4 },
                     '& .MuiSlider-rail': { height: 4 },
