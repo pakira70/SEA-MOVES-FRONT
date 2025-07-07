@@ -1,4 +1,4 @@
-// src/pages/ModelSetupPage.jsx - SIMPLIFYING SHUTTLE LAYOUT
+// src/pages/ModelSetupPage.jsx - TEXT UPDATED FOR CLARITY
 import React from 'react';
 import {
     Typography, Paper, Box, Grid, TextField, Divider, Tooltip, Alert,
@@ -78,7 +78,8 @@ function ModelSetupPage({
                     </Grid>
 
                     <Grid item xs={12} md={6}>
-                        <Typography variant="h6" gutterBottom>Off-site Shuttle Model</Typography>
+                        {/* --- TEXT CHANGE 1 --- */}
+                        <Typography variant="h6" gutterBottom>Parking Shuttle Model</Typography>
                         <FormControlLabel
                             control={
                                 <Checkbox
@@ -87,7 +88,8 @@ function ModelSetupPage({
                                     name="includeShuttleCosts"
                                 />
                             }
-                            label="Include shuttle operation costs"
+                            // --- TEXT CHANGE 2 ---
+                            label="Include parking shuttle operations costs"
                             sx={{ display: 'block', mb: 2 }}
                         />
                         

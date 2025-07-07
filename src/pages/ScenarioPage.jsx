@@ -1,4 +1,4 @@
-// src/pages/ScenarioPage.jsx - FINAL RECOVERY VERSION (WITH STYLES OBJECT)
+// src/pages/ScenarioPage.jsx - PARKING CARD METRIC CORRECTED
 import React, { useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { Grid, Paper, Typography, CircularProgress, Box } from '@mui/material';
@@ -31,12 +31,15 @@ function ScenarioPage({
 
     const parkingImpactProps = useMemo(() => ({
         title: `Parking Capital Cost (${numYears} yrs)`, 
-        metricLabel: "stalls needed",
+        // --- BUG FIX START ---
+        metricLabel: "new stalls built", // Changed label for clarity
         finalYear: finalYear,
         baselineCost: sumArray(baselineApiResponseData?.parking?.cost_per_year),
         scenarioCost: sumArray(apiResponseData?.parking?.cost_per_year),
-        baselineMetricValue: getLastElement(baselineApiResponseData?.parking?.demand_per_year),
-        scenarioMetricValue: getLastElement(apiResponseData?.parking?.demand_per_year),
+        // Use the SUM of the shortfall array, not the last element of the demand array
+        baselineMetricValue: sumArray(baselineApiResponseData?.parking?.shortfall_per_year),
+        scenarioMetricValue: sumArray(apiResponseData?.parking?.shortfall_per_year),
+        // --- BUG FIX END ---
     }), [baselineApiResponseData, apiResponseData, finalYear, numYears]);
 
     const shuttleImpactProps = useMemo(() => {
