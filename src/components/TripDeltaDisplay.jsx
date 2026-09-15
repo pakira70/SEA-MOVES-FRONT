@@ -109,7 +109,7 @@ function TripDeltaDisplay({ deltas, activeModeDetails, sortedActiveModeKeys }) {
                 // You might need to adjust these based on your desired layout for 7 items.
                 // Using lg={Math.floor(12 / Math.min(keysToIterate.length, 6))} could be dynamic but complex.
                 // For 7 items, lg={2} means 6 fit, 1 wraps. Or adjust padding/spacing.
-                <Grid item xs={6} sm={4} md={3} lg={2} key={modeKey} >
+                <Grid size={{ xs: 6, sm: 4, md: 3, lg: 2 }} key={modeKey} >
                     <Paper elevation={1} sx={{ p: 2, textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: 140 }}>
                         <IconComponent sx={{ fontSize: 40, mb: 1, color: 'primary.main' }} />
                                                 <Typography variant="body2" sx={{ fontWeight: 'medium', mb: 0.5, wordBreak: 'break-word' }}>

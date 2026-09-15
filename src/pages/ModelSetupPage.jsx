@@ -35,12 +35,12 @@ function ModelSetupPage({
 
                 <Grid container spacing={4}>
                     {/* === Section 1: Time Frame & Population === */}
-                    <Grid item xs={12} md={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                          <Typography variant="h6" gutterBottom> Simulation Time Frame </Typography>
                          <TextField fullWidth label="Start Year" variant="outlined" size="small" name="startYear" type="number" value={intermediateNumberInputs.startYear || ''} onChange={onBaselineNumberInputChange} onBlur={onBaselineNumberCommit} onKeyDown={handleNumberKeyDown} inputProps={{ step: "1" }} sx={{ mb: 2 }} />
                          <TextField fullWidth label="Number of Years" variant="outlined" size="small" name="numYears" type="number" value={intermediateNumberInputs.numYears || ''} onChange={onBaselineNumberInputChange} onBlur={onBaselineNumberCommit} onKeyDown={handleNumberKeyDown} inputProps={{ step: "1" }} />
                     </Grid>
-                     <Grid item xs={12} md={6}>
+                     <Grid size={{ xs: 12, md: 6 }}>
                          <Typography variant="h6" gutterBottom> Default Population & Attendance </Typography>
                          <TextField fullWidth label="Start Population" variant="outlined" size="small" name="quickStartPopulation" type="number" value={intermediateNumberInputs.quickStartPopulation || ''} onChange={onBaselineNumberInputChange} onBlur={onBaselineNumberCommit} onKeyDown={handleNumberKeyDown} inputProps={{ step: "1" }} sx={{ mb: 2 }}/>
                          <TextField fullWidth label="Annual Growth Rate (%)" variant="outlined" size="small" name="quickAnnualGrowthRate" type="number" value={intermediateNumberInputs.quickAnnualGrowthRate || ''} onChange={onBaselineNumberInputChange} onBlur={onBaselineNumberCommit} onKeyDown={handleNumberKeyDown} inputProps={{ step: "0.1" }} sx={{ mb: 2 }}/>
@@ -68,16 +68,16 @@ function ModelSetupPage({
                          />
                     </Grid>
 
-                    <Grid item xs={12}><Divider sx={{ my: 2 }} /></Grid>
+                    <Grid size={12}><Divider sx={{ my: 2 }} /></Grid>
                     
                     {/* === Section 2: Parking & Shuttle (REORGANIZED) === */}
-                    <Grid item xs={12} md={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Typography variant="h6" gutterBottom>Default Parking Model</Typography>
                         <TextField fullWidth label="Starting Parking Supply" variant="outlined" size="small" name="quickStartParkingSupply" type="number" value={intermediateNumberInputs.quickStartParkingSupply || ''} onChange={onBaselineNumberInputChange} onBlur={onBaselineNumberCommit} onKeyDown={handleNumberKeyDown} inputProps={{ step: "1" }} sx={{ mb: 2 }}/>
                         <TextField fullWidth label="Cost per Space ($)" variant="outlined" size="small" name="defaultParkingCost" type="number" value={intermediateNumberInputs.defaultParkingCost || ''} onChange={onBaselineNumberInputChange} onBlur={onBaselineNumberCommit} onKeyDown={handleNumberKeyDown} inputProps={{ step: "1" }} />
                     </Grid>
 
-                    <Grid item xs={12} md={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         {/* --- TEXT CHANGE 1 --- */}
                         <Typography variant="h6" gutterBottom>Parking Shuttle Model</Typography>
                         <FormControlLabel
@@ -106,14 +106,14 @@ function ModelSetupPage({
                         <TextField fullWidth label="Annual Operating Days" name="shuttleOperatingDays" type="number" value={intermediateNumberInputs.shuttleOperatingDays || ''} disabled={shuttleFieldsDisabled} onChange={onBaselineNumberInputChange} onBlur={onBaselineNumberCommit} onKeyDown={handleNumberKeyDown} size="small" />
                     </Grid>
 
-                    <Grid item xs={12}><Divider sx={{ my: 2 }} /></Grid>
+                    <Grid size={12}><Divider sx={{ my: 2 }} /></Grid>
 
-                    <Grid item xs={12}>
+                    <Grid size={12}>
                         <Typography variant="h6" gutterBottom> Advanced Baseline Configuration </Typography>
                         <Alert severity="info" sx={{ mt: 1 }}> Detailed setup for baseline active modes, their percentage shares, and display customizations (name/color) will be available in an "Advanced Setup" section soon. For now, the model uses system defaults for these. </Alert>
                     </Grid>
 
-                    <Grid item xs={12} sx={{mt: 3, textAlign: 'left', width: '100%'}}>
+                    <Grid size={12} sx={{mt: 3, textAlign: 'left', width: '100%'}}>
                         <Typography variant="caption" color="text.secondary"> Configuration updates are saved as you make them and will be used when 'Reset to Baseline' is triggered on the Scenario Tool. </Typography>
                     </Grid>
                 </Grid>

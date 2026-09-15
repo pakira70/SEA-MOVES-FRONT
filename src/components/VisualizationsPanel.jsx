@@ -18,7 +18,7 @@ function VisualizationsPanel({
 
   return (
     <Grid container spacing={3} alignItems="stretch">
-      <Grid item xs={12} md={5}>
+      <Grid size={{ xs: 12, md: 5 }}>
          <Typography variant="subtitle1" align="center" gutterBottom>Mode Share</Typography>
          <Box sx={{ height: 300, position: 'relative' }}>
             <ModeShareChart
@@ -27,7 +27,7 @@ function VisualizationsPanel({
             />
          </Box>
       </Grid>
-      <Grid item xs={12} md={7}>
+      <Grid size={{ xs: 12, md: 7 }}>
          <Typography variant="subtitle1" align="center" gutterBottom>Parking Supply vs. Demand</Typography>
          <Box sx={{ height: 300, position: 'relative' }}>
             <ParkingChart

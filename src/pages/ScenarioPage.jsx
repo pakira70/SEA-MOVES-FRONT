@@ -76,7 +76,7 @@ function ScenarioPage({
     return (
         <Grid container spacing={3}>
             {/* --- TOP ROW: VISUALIZATIONS --- */}
-            <Grid item xs={12}>
+            <Grid size={12}>
                 <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', minHeight: {xs: 300, md: 500}, position: 'relative', overflow: 'hidden' }}>
                     <Typography variant="h6" gutterBottom>Visualizations</Typography>
                     {isLoading && (<Box sx={styles.centerBox}><CircularProgress /></Box>)}
@@ -98,15 +98,15 @@ function ScenarioPage({
             </Grid>
 
             {/* --- NEW ROW: IMPACT CARDS --- */}
-            <Grid item xs={12}>
+            <Grid size={12}>
                 <Grid container spacing={3}>
-                    <Grid item xs={12} md={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Paper sx={{ height: '100%' }}>
                            <ImpactCard isLoading={isLoading} error={interactiveError} {...parkingImpactProps} />
                         </Paper>
                     </Grid>
                     {hasData && shuttleImpactProps.showCard && (
-                        <Grid item xs={12} md={6}>
+                        <Grid size={{ xs: 12, md: 6 }}>
                             <Paper sx={{ height: '100%' }}>
                                 <ImpactCard isLoading={isLoading} error={interactiveError} {...shuttleImpactProps} />
                             </Paper>
@@ -116,7 +116,7 @@ function ScenarioPage({
             </Grid>
             
             {/* --- Trip Delta Display --- */}
-            <Grid item xs={12}>
+            <Grid size={12}>
                 <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', minHeight: 188 }}>
                     <Typography variant="h6" gutterBottom>Change in Daily Trips ({finalYear}) vs Baseline</Typography>
                     <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -130,7 +130,7 @@ function ScenarioPage({
             </Grid>
 
             {/* --- Controls Panel --- */}
-           <Grid item xs={12}>
+           <Grid size={12}>
                 <Paper sx={{ p: 2 }}>
                     <Typography variant="h6" gutterBottom>Interactive Scenario Inputs</Typography>
                     <ControlsPanel

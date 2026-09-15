@@ -119,7 +119,7 @@ function ControlsPanel({
           const modeDisplayName = modeInfo.name || modeKey;
 
           return (
-            <Grid item xs={12} sm={6} md={4} key={modeKey}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={modeKey}>
               <Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: -0.5 }}>
                   <Typography component="label" htmlFor={`${modeKey}-input`} sx={{ minWidth: '80px', textAlign: 'right', mr:1, fontSize: '0.875rem' }}>{modeDisplayName}:</Typography>
@@ -164,7 +164,7 @@ function ControlsPanel({
             </Grid>
           );
         })}
-        {keysToIterate.length === 0 && ( <Grid item xs={12}> <Typography sx={{p:1, fontStyle: 'italic'}}> No active modes configured.</Typography> </Grid> )}
+        {keysToIterate.length === 0 && ( <Grid size={12}> <Typography sx={{p:1, fontStyle: 'italic'}}> No active modes configured.</Typography> </Grid> )}
       </Grid>
       <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end' }}>
         <Button variant="outlined" onClick={onReset} disabled={isLoading} sx={{ color: 'primary.main', borderColor: 'primary.main' }}> Reset to Baseline </Button>

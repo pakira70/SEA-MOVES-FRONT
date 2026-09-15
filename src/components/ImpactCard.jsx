@@ -62,14 +62,14 @@ function ImpactCard({
             <Divider sx={{ my: 1.5 }} />
 
             <Grid container spacing={2} sx={{ mb: 1.5 }}>
-                <Grid item xs={6}>
+                <Grid size={6}>
                     <Typography variant="body2" fontWeight="bold">Baseline</Typography>
                     <Typography variant="h6">{formatCurrency(baselineCost)}</Typography>
                     <Typography variant="body2" color="text.secondary">
                         ({formatNumber(baselineMetricValue)} {metricLabel})
                     </Typography>
                 </Grid>
-                <Grid item xs={6}>
+                <Grid size={6}>
                     <Typography variant="body2" fontWeight="bold">Scenario</Typography>
                     {isSameAsBaseline ? (
                         <Typography variant="h6" color="text.secondary" sx={{ fontStyle: 'italic' }}>--</Typography>
