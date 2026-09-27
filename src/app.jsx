@@ -41,7 +41,7 @@ function App() {
     quickStartPopulation: FALLBACK_POPULATION,
     quickAnnualGrowthRate: 0,
     quickStartParkingSupply: FALLBACK_PARKING_SUPPLY,
-    includeShuttleCosts: false,
+    includeShuttleCosts: true,
     shuttleBaselineCost: 12000000,
     shuttleParkingPercentage: 50,
     shuttleCostPerHour: 100,
