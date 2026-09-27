@@ -1,7 +1,7 @@
 // src/components/TripDeltaDisplay.jsx
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Grid, Box, Typography, Paper } from '@mui/material';
+import { Box, Typography, Paper } from '@mui/material';
 
 // Import Icons - Ensure all icons you might use are imported
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
@@ -78,7 +78,18 @@ function TripDeltaDisplay({ deltas, activeModeDetails, sortedActiveModeKeys }) {
   }
 
   return (
-    <Grid container spacing={2} alignItems="stretch">
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: {
+          xs: 'repeat(2, minmax(0, 1fr))',
+          sm: 'repeat(3, minmax(0, 1fr))',
+          md: 'repeat(7, minmax(0, 1fr))',
+        },
+        gap: 2,
+        width: '100%',
+      }}
+    >
         {keysToIterate.map((modeKey) => {
             const modeInfo = activeModeDetails[modeKey];
             if (!modeInfo) {
@@ -92,16 +103,7 @@ function TripDeltaDisplay({ deltas, activeModeDetails, sortedActiveModeKeys }) {
             const IconComponent = modeIcons[modeKey] || modeIcons["DEFAULT"];
 
             return (
-                // Adjusted Grid item sizing for potentially 7 items.
-                // xs={6} (2 per row on extra small)
-                // sm={4} (3 per row on small)
-                // md={3} (4 per row on medium)
-                // lg={2} (6 per row on large, will wrap for 7th item)
-                // You might need to adjust these based on your desired layout for 7 items.
-                // Using lg={Math.floor(12 / Math.min(keysToIterate.length, 6))} could be dynamic but complex.
-                // For 7 items, lg={2} means 6 fit, 1 wraps. Or adjust padding/spacing.
-                <Grid size={{ xs: 6, sm: 4, md: 3, lg: 2 }} key={modeKey} >
-                    <Paper elevation={1} sx={{ p: 2, textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: 140 }}>
+                    <Paper key={modeKey} elevation={1} sx={{ p: 2, textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: 140, minWidth: 0 }}>
                         <IconComponent sx={{ fontSize: 40, mb: 1, color: modeInfo.color }} />
                                                 <Typography variant="body2" sx={{ fontWeight: 'medium', mb: 0.5, wordBreak: 'break-word' }}>
                             {modeName}
@@ -113,10 +115,9 @@ function TripDeltaDisplay({ deltas, activeModeDetails, sortedActiveModeKeys }) {
                             trips/day
                         </Typography>
                     </Paper>
-                </Grid>
             );
         })}
-    </Grid>
+    </Box>
   );
 }
 
