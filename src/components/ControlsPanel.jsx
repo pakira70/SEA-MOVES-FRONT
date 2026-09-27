@@ -154,7 +154,8 @@ function ControlsPanel({
                     '& .MuiSlider-thumb': { 
                         width: 12, 
                         height: 12, 
-                        marginTop: '-1px', // As you fixed.
+                        top: '50%',
+                        transform: 'translate(-50%, -50%)',
                     }, 
                     '& .MuiSlider-track': { height: 4 },
                     '& .MuiSlider-rail': { height: 4 },

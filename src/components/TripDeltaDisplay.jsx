@@ -69,14 +69,9 @@ const modeDetailsShape = PropTypes.shape({
 
 // --- Component Definition ---
 function TripDeltaDisplay({ deltas, activeModeDetails, sortedActiveModeKeys }) {
-  // CRITICAL LOG for receiving sorted keys
-  console.log("[CRITICAL_PROP_LOG] TripDeltaDisplay.jsx - RECEIVED sortedActiveModeKeys:", JSON.stringify(sortedActiveModeKeys));
-
   const keysToIterate = (Array.isArray(sortedActiveModeKeys) && sortedActiveModeKeys.length > 0)
                         ? sortedActiveModeKeys
                         : Object.keys(activeModeDetails || {});
-  // CRITICAL LOG for the actual keys being used to map
-  console.log("[CRITICAL_PROP_LOG] TripDeltaDisplay.jsx - keysToIterate (used for .map):", JSON.stringify(keysToIterate));
 
   if (keysToIterate.length === 0) {
     return <Typography sx={{ p: 2, fontStyle: 'italic', textAlign: 'center' }}>No selected modes or data available to display deltas.</Typography>;
@@ -84,11 +79,10 @@ function TripDeltaDisplay({ deltas, activeModeDetails, sortedActiveModeKeys }) {
 
   return (
     <Grid container spacing={2} alignItems="stretch">
-        {keysToIterate.map((modeKey, index) => { // Added 'index'
+        {keysToIterate.map((modeKey) => {
             const modeInfo = activeModeDetails[modeKey];
             if (!modeInfo) {
-                console.warn(`[RENDER_ORDER_DEBUG] TripDeltaDisplay: No modeInfo found for key: ${modeKey} at index ${index}. Skipping render for this item.`);
-                return null; // Skip rendering if modeInfo is missing for a key
+                return null;
             }
 
             const modeName = modeInfo.name || modeKey; // Fallback to key if name is missing
@@ -96,9 +90,6 @@ function TripDeltaDisplay({ deltas, activeModeDetails, sortedActiveModeKeys }) {
             const formattedValue = formatDelta(deltaValue);
             const color = getColorForDelta(deltaValue);
             const IconComponent = modeIcons[modeKey] || modeIcons["DEFAULT"];
-
-            // Log the order it *thinks* it's rendering
-            console.log(`[RENDER_ORDER_DEBUG] TripDeltaDisplay: Rendering item ${index + 1} - ${modeKey} - ${modeName}`);
 
             return (
                 // Adjusted Grid item sizing for potentially 7 items.
@@ -111,7 +102,7 @@ function TripDeltaDisplay({ deltas, activeModeDetails, sortedActiveModeKeys }) {
                 // For 7 items, lg={2} means 6 fit, 1 wraps. Or adjust padding/spacing.
                 <Grid size={{ xs: 6, sm: 4, md: 3, lg: 2 }} key={modeKey} >
                     <Paper elevation={1} sx={{ p: 2, textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: 140 }}>
-                        <IconComponent sx={{ fontSize: 40, mb: 1, color: 'primary.main' }} />
+                        <IconComponent sx={{ fontSize: 40, mb: 1, color: modeInfo.color }} />
                                                 <Typography variant="body2" sx={{ fontWeight: 'medium', mb: 0.5, wordBreak: 'break-word' }}>
                             {modeName}
                         </Typography>

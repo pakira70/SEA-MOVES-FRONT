@@ -3,24 +3,107 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Routes, Route, NavLink } from 'react-router-dom';
 import {
   Container, Typography, Box, AppBar, Toolbar, Button,
-  CssBaseline, ThemeProvider, createTheme, CircularProgress, Alert, Link
+  CssBaseline, ThemeProvider, createTheme, CircularProgress, Alert
 } from '@mui/material';
 
 import ScenarioPage from './pages/ScenarioPage.jsx';
 import ModelSetupPage from './pages/ModelSetupPage.jsx';
 import { AVAILABLE_MODES, calculateScenario } from './localCalculation.js';
 
+const colors = {
+  paper: '#f2ece0',
+  paper2: '#e9e1d2',
+  ink: '#1c1a17',
+  ink2: '#463f38',
+  ink3: '#5c5349',
+  signal: '#c2410c',
+  rule: '#c9a961',
+  ruleDeep: '#ab8434',
+  deep: '#2e4f57',
+  keeps: '#0f5847',
+  crimson: '#8e2f33',
+};
+
 const theme = createTheme({
   palette: {
-    primary: { main: '#1976D2' },
-    secondary: { main: '#ffc107' },
-    background: { 
-      default: '#f5f5f5',
-      paper: '#ffffff'
-    }
+    mode: 'light',
+    primary: { main: colors.signal, contrastText: colors.paper },
+    secondary: { main: colors.deep, contrastText: colors.paper },
+    error: { main: colors.crimson },
+    success: { main: colors.keeps },
+    background: { default: colors.paper, paper: colors.paper },
+    text: { primary: colors.ink, secondary: colors.ink3 },
+    divider: colors.rule,
   },
-  typography: { fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif' },
+  typography: {
+    fontFamily: '"IBM Plex Sans", system-ui, sans-serif',
+    h1: { fontFamily: '"Fraunces", Georgia, serif', fontWeight: 600, letterSpacing: '-0.016em' },
+    h2: { fontFamily: '"Fraunces", Georgia, serif', fontWeight: 600, letterSpacing: '-0.012em' },
+    h3: { fontFamily: '"Fraunces", Georgia, serif', fontWeight: 600 },
+    h4: { fontFamily: '"Fraunces", Georgia, serif', fontWeight: 600 },
+    h5: { fontFamily: '"Fraunces", Georgia, serif', fontWeight: 600 },
+    h6: { fontFamily: '"Fraunces", Georgia, serif', fontWeight: 600 },
+    button: { fontFamily: '"IBM Plex Mono", monospace', fontSize: '0.72rem', fontWeight: 500, letterSpacing: '0.12em' },
+    caption: { fontFamily: '"IBM Plex Mono", monospace', letterSpacing: '0.02em' },
+  },
+  shape: { borderRadius: 2 },
+  components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        body: { backgroundColor: colors.paper, color: colors.ink },
+        '::selection': { backgroundColor: colors.rule, color: colors.ink },
+      },
+    },
+    MuiPaper: {
+      defaultProps: { elevation: 0 },
+      styleOverrides: {
+        root: {
+          backgroundImage: 'none',
+          border: `1px solid ${colors.rule}`,
+          boxShadow: 'none',
+        },
+      },
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: { borderRadius: 0, textTransform: 'uppercase' },
+        outlined: { borderColor: colors.ruleDeep },
+      },
+    },
+    MuiDivider: { styleOverrides: { root: { borderColor: colors.rule } } },
+    MuiOutlinedInput: {
+      styleOverrides: {
+        root: {
+          backgroundColor: colors.paper,
+          '& fieldset': { borderColor: colors.rule },
+          '&:hover fieldset': { borderColor: colors.ruleDeep },
+          '&.Mui-focused fieldset': { borderColor: colors.signal, borderWidth: 1 },
+        },
+      },
+    },
+    MuiSlider: {
+      styleOverrides: {
+        root: { color: colors.signal },
+        rail: { backgroundColor: colors.rule, opacity: 0.55 },
+      },
+    },
+    MuiAlert: {
+      styleOverrides: {
+        root: { backgroundColor: colors.paper2, borderColor: colors.rule },
+      },
+    },
+  },
 });
+
+function NucBrandMark() {
+  return (
+    <Box className="nuc-brand-mark" role="img" aria-label="Nunes-Ueno Consulting">
+      <span className="nuc-brand-mark__line"><i>N</i><i>U</i><i>N</i><i>E</i><i>S</i></span>
+      <span className="nuc-brand-mark__line"><i>U</i><i>E</i><i>N</i><i>O</i></span>
+      <span className="nuc-brand-mark__label"><i>C</i><i>O</i><i>N</i><i>S</i><i>U</i><i>L</i><i>T</i><i>I</i><i>N</i><i>G</i></span>
+    </Box>
+  );
+}
 
 const FALLBACK_START_YEAR = 2024;
 const FALLBACK_NUM_YEARS = 5;
@@ -244,14 +327,27 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-        <AppBar position="static" sx={{ mb: 3, bgcolor: theme.palette.primary.main, flexShrink: 0 }}>
-          <Toolbar>
-            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>SEA MOVES</Typography>
-            <Button component={NavLink} to="/" style={({ isActive }) => ({ color: 'white', fontWeight: isActive ? 'bold' : 'normal' })}>Scenario Tool</Button>
-            <Button component={NavLink} to="/setup" style={({ isActive }) => ({ color: 'white', fontWeight: isActive ? 'bold' : 'normal' })}>Model Setup</Button>
+        <AppBar position="sticky" color="transparent" elevation={0} className="nuc-appbar">
+          <Toolbar className="nuc-toolbar" disableGutters>
+            <Box className="nuc-lockup">
+              <NucBrandMark />
+              <Box className="nuc-product-lockup">
+                <Typography className="nuc-product-code">TDM.NU</Typography>
+                <Typography className="nuc-product-name">Transportation demand model</Typography>
+              </Box>
+            </Box>
+            <Box component="nav" className="nuc-nav" aria-label="Primary navigation">
+              <Button component={NavLink} to="/" className={({ isActive }) => (isActive ? 'is-active' : '')}>Scenario</Button>
+              <Button component={NavLink} to="/setup" className={({ isActive }) => (isActive ? 'is-active' : '')}>Model setup</Button>
+            </Box>
           </Toolbar>
         </AppBar>
-        <Container maxWidth="xl" component="main" sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', py: 2 }}>
+        <Container maxWidth="xl" component="main" className="nuc-main">
+          <Box className="nuc-page-intro">
+            <Typography className="nuc-eyebrow">TDM.NU / decision support</Typography>
+            <Typography component="h1">Transportation demand model</Typography>
+            <Typography className="nuc-lede">Test mode-share and parking choices against a clear operating baseline.</Typography>
+          </Box>
           <Box sx={{ flexGrow: 1 }}>
             <Routes>
               <Route path="/" element={
@@ -271,11 +367,12 @@ function App() {
                   /> } />
             </Routes>
           </Box>
-          <Box component="footer" sx={{ py: 2, mt: 4, flexShrink: 0, borderTop: '1px solid', borderColor: 'divider' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
-              <img src="/images/NUClogo.png" alt="Nunes-Ueno Consulting Logo" style={{ height: '30px', marginRight: '15px' }} />
-              <Typography variant="caption" component="span"> © {new Date().getFullYear()} Nunes-Ueno Consulting. </Typography>
+          <Box component="footer" className="nuc-footer">
+            <Box className="nuc-footer__firm">
+              <span className="nuc-footer__dot" aria-hidden="true" />
+              <Typography component="span">Nunes–Ueno Consulting</Typography>
             </Box>
+            <Typography component="span" className="nuc-footer__meta">tdm.nunes-ueno.com · © {new Date().getFullYear()}</Typography>
           </Box>
         </Container>
       </Box>

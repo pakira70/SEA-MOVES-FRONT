@@ -1,68 +1,252 @@
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('/fonts/fraunces-latin-full-normal.woff2') format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-display: swap;
   font-weight: 400;
+  src: url('/fonts/ibm-plex-sans-latin-400-normal.woff2') format('woff2');
+}
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url('/fonts/ibm-plex-sans-latin-500-normal.woff2') format('woff2');
+}
 
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url('/fonts/ibm-plex-sans-latin-600-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans Condensed';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('/fonts/ibm-plex-sans-condensed-latin-700-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('/fonts/ibm-plex-mono-latin-400-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url('/fonts/ibm-plex-mono-latin-500-normal.woff2') format('woff2');
+}
+
+:root {
+  color: #1c1a17;
+  background: #f2ece0;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --paper: #f2ece0;
+  --paper-2: #e9e1d2;
+  --ink: #1c1a17;
+  --ink-2: #463f38;
+  --ink-3: #5c5349;
+  --signal: #c2410c;
+  --rule-ochre: #c9a961;
+  --ochre-deep: #ab8434;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
+* { box-sizing: border-box; }
+
+html { background: var(--paper); }
 
 body {
   margin: 0;
-  /*display: flex;*/
-  /*place-items: center;*/
- min-width: 320px;
+  min-width: 320px;
   min-height: 100vh;
+  background: var(--paper);
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+.nuc-appbar {
+  background: color-mix(in srgb, var(--paper) 96%, transparent) !important;
+  color: var(--ink) !important;
+  border-bottom: 1px solid var(--ochre-deep);
+  backdrop-filter: blur(12px);
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
+.nuc-toolbar {
+  width: min(100% - 48px, 1480px);
+  min-height: 82px !important;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.nuc-lockup,
+.nuc-nav,
+.nuc-footer,
+.nuc-footer__firm {
+  display: flex;
+  align-items: center;
+}
+
+.nuc-lockup { gap: 18px; }
+
+.nuc-brand-mark {
+  width: 82px;
+  flex: 0 0 82px;
+  padding: 6px;
+  position: relative;
+  background: var(--signal);
+}
+
+.nuc-brand-mark::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid var(--paper);
+  pointer-events: none;
+}
+
+.nuc-brand-mark i { font-style: normal; }
+
+.nuc-brand-mark__line,
+.nuc-brand-mark__label {
+  display: flex;
+  justify-content: space-between;
+  color: var(--paper);
+}
+
+.nuc-brand-mark__line {
+  font-family: 'IBM Plex Sans Condensed', sans-serif;
+  font-size: 23px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.nuc-brand-mark__label {
+  margin-top: 3px;
+  padding-top: 3px;
+  border-top: 1px solid color-mix(in srgb, var(--paper) 55%, transparent);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 5px;
   font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  line-height: 1;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+.nuc-product-code {
+  font-family: 'IBM Plex Mono', monospace !important;
+  color: var(--signal);
+  font-size: 0.76rem !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.18em !important;
+}
+
+.nuc-product-name {
+  margin-top: 2px !important;
+  color: var(--ink-2);
+  font-family: 'Fraunces', Georgia, serif !important;
+  font-size: 1.1rem !important;
+  font-weight: 600 !important;
+}
+
+.nuc-nav { gap: 4px; align-self: stretch; }
+
+.nuc-nav a {
+  min-height: 100%;
+  padding: 0 14px;
+  color: var(--ink-3);
+  border-bottom: 3px solid transparent;
+}
+
+.nuc-nav a:hover,
+.nuc-nav a.is-active {
+  color: var(--signal);
+  background: transparent;
+  border-bottom-color: var(--signal);
+}
+
+.nuc-main {
+  flex: 1;
+  display: flex !important;
+  flex-direction: column;
+  padding-top: 34px !important;
+  padding-bottom: 0 !important;
+}
+
+.nuc-page-intro {
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--ochre-deep);
+}
+
+.nuc-page-intro h1 {
+  margin: 7px 0 0;
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  font-weight: 600;
+  line-height: 1.03;
+  letter-spacing: -0.016em;
+}
+
+.nuc-eyebrow,
+.nuc-footer__meta {
+  font-family: 'IBM Plex Mono', monospace !important;
+  font-size: 0.7rem !important;
+  letter-spacing: 0.16em !important;
+  text-transform: uppercase;
+}
+
+.nuc-eyebrow { color: var(--signal); }
+
+.nuc-lede {
+  max-width: 48rem;
+  margin-top: 8px !important;
+  color: var(--ink-2);
+  font-size: 1rem !important;
+}
+
+.nuc-footer {
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 48px;
+  padding: 22px 0 28px;
+  color: var(--ink-3);
+  border-top: 1px solid var(--ochre-deep);
+}
+
+.nuc-footer__firm { gap: 9px; }
+.nuc-footer__firm span:last-child { font-weight: 500; }
+.nuc-footer__dot { width: 9px; height: 9px; border-radius: 50%; background: var(--signal); }
+.nuc-footer__meta { font-size: 0.62rem !important; color: var(--ink-3); }
+
+@media (max-width: 700px) {
+  .nuc-toolbar { width: min(100% - 28px, 1480px); min-height: 72px !important; }
+  .nuc-brand-mark { width: 70px; flex-basis: 70px; }
+  .nuc-brand-mark__line { font-size: 19px; }
+  .nuc-product-name { display: none; }
+  .nuc-nav a { padding: 0 8px; font-size: 0.62rem; }
+  .nuc-main { padding-top: 24px !important; }
+  .nuc-page-intro { margin-bottom: 20px; }
+  .nuc-footer { align-items: flex-start; flex-direction: column; gap: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }

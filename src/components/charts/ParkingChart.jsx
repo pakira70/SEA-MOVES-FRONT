@@ -46,12 +46,12 @@ function ParkingChart({ years, baselineDemand, scenarioDemand, supply }) {
      }
      const labels = years.map(String);
 
-     const baselineColor = theme.palette.error.main; 
-     const scenarioColor = theme.palette.text.primary; 
-     
-     const desiredParkingSupplyColor = '#75C1FF'; 
+     const baselineColor = theme.palette.secondary.main;
+     const scenarioColor = theme.palette.primary.main;
+
+     const desiredParkingSupplyColor = '#c9a961';
      const parkingSupplyBorderColor = desiredParkingSupplyColor; 
-     const parkingSupplyFillColorWithTransparency = 'rgba(117, 193, 255, 0.7)';
+     const parkingSupplyFillColorWithTransparency = 'rgba(201, 169, 97, 0.48)';
 
      return {
         labels: labels,
@@ -132,7 +132,8 @@ function ParkingChart({ years, baselineDemand, scenarioDemand, supply }) {
           boxWidth: 8,
           boxHeight: 8,
           padding: 15,
-          font: { size: 11 },
+          color: theme.palette.text.secondary,
+          font: { family: 'IBM Plex Sans', size: 11 },
           generateLabels: function(chart) {
               const datasets = chart.data.datasets;
               const allLabelObjects = datasets.map((dataset, i) => {
@@ -186,13 +187,20 @@ function ParkingChart({ years, baselineDemand, scenarioDemand, supply }) {
       datalabels: { display: false }
     },
     scales: {
-      x: { display: true, title: { display: true, text: 'Year' } },
+      x: {
+        display: true,
+        grid: { color: 'rgba(201, 169, 97, 0.22)' },
+        ticks: { color: theme.palette.text.secondary, font: { family: 'IBM Plex Mono', size: 10 } },
+        title: { display: true, text: 'Year', color: theme.palette.text.secondary, font: { family: 'IBM Plex Sans' } },
+      },
       y: { 
         display: true, 
         position: 'left', 
-        title: { display: true, text: 'Number of Spaces' }, 
         beginAtZero: true, 
-        suggestedMax: suggestedMaxY 
+        suggestedMax: suggestedMaxY,
+        grid: { color: 'rgba(201, 169, 97, 0.22)' },
+        ticks: { color: theme.palette.text.secondary, font: { family: 'IBM Plex Mono', size: 10 } },
+        title: { display: true, text: 'Number of Spaces', color: theme.palette.text.secondary, font: { family: 'IBM Plex Sans' } },
       },
     },
   };

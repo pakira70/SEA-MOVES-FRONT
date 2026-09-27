@@ -47,7 +47,7 @@ function ModeShareChart({ modeShares, activeModeDetails }) {
           label: 'Mode Share %',
           data: dataValues, // dataValues are now numbers
           backgroundColor: backgroundColors,
-          borderColor: '#ffffff', 
+          borderColor: '#f2ece0',
           borderWidth: 1,
         },
       ],

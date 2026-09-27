@@ -1,11 +1,11 @@
 export const AVAILABLE_MODES = [
-  { key: 'DRIVE', defaultName: 'Drive', defaultColor: '#D32F2F', category: 'Personal Vehicles', flags: { affects_parking: true, affects_emissions: true, affects_cost: true }, parking_factor_per_person: 1, isDefaultActive: true, defaultBaselineShare: 71 },
-  { key: 'DROPOFF', defaultName: 'Drop-off', defaultColor: '#455A64', category: 'Personal Transport', flags: { affects_parking: false, affects_emissions: true, affects_cost: true }, parking_factor_per_person: 0, isDefaultActive: true, defaultBaselineShare: 5 },
-  { key: 'CARPOOL', defaultName: 'Carpool', defaultColor: '#FF6F00', category: 'Carpool & Vanpool', flags: { affects_parking: true, affects_emissions: true, affects_cost: true }, parking_factor_per_person: 0.5, isDefaultActive: true, defaultBaselineShare: 1 },
-  { key: 'VANPOOL', defaultName: 'Vanpool', defaultColor: '#4E342E', category: 'Carpool & Vanpool', flags: { affects_parking: true, affects_emissions: true, affects_cost: true }, parking_factor_per_person: 0.2, isDefaultActive: true, defaultBaselineShare: 1 },
-  { key: 'BIKE', defaultName: 'Bike', defaultColor: '#0288D1', category: 'Micromobility & Active', flags: { affects_parking: false, affects_emissions: false, affects_cost: false }, parking_factor_per_person: 0, isDefaultActive: true, defaultBaselineShare: 1 },
-  { key: 'WALK', defaultName: 'Walk', defaultColor: '#388E3C', category: 'Micromobility & Active', flags: { affects_parking: false, affects_emissions: false, affects_cost: false }, parking_factor_per_person: 0, isDefaultActive: true, defaultBaselineShare: 2 },
-  { key: 'TRANSIT', defaultName: 'Transit', defaultColor: '#F57C00', category: 'Transit', flags: { affects_parking: false, affects_emissions: true, affects_cost: true }, parking_factor_per_person: 0, isDefaultActive: true, defaultBaselineShare: 19 },
+  { key: 'DRIVE', defaultName: 'Drive', defaultColor: '#c2410c', category: 'Personal Vehicles', flags: { affects_parking: true, affects_emissions: true, affects_cost: true }, parking_factor_per_person: 1, isDefaultActive: true, defaultBaselineShare: 71 },
+  { key: 'DROPOFF', defaultName: 'Drop-off', defaultColor: '#2e4f57', category: 'Personal Transport', flags: { affects_parking: false, affects_emissions: true, affects_cost: true }, parking_factor_per_person: 0, isDefaultActive: true, defaultBaselineShare: 5 },
+  { key: 'CARPOOL', defaultName: 'Carpool', defaultColor: '#c07c18', category: 'Carpool & Vanpool', flags: { affects_parking: true, affects_emissions: true, affects_cost: true }, parking_factor_per_person: 0.5, isDefaultActive: true, defaultBaselineShare: 1 },
+  { key: 'VANPOOL', defaultName: 'Vanpool', defaultColor: '#463f38', category: 'Carpool & Vanpool', flags: { affects_parking: true, affects_emissions: true, affects_cost: true }, parking_factor_per_person: 0.2, isDefaultActive: true, defaultBaselineShare: 1 },
+  { key: 'BIKE', defaultName: 'Bike', defaultColor: '#2e7a6f', category: 'Micromobility & Active', flags: { affects_parking: false, affects_emissions: false, affects_cost: false }, parking_factor_per_person: 0, isDefaultActive: true, defaultBaselineShare: 1 },
+  { key: 'WALK', defaultName: 'Walk', defaultColor: '#6e7a33', category: 'Micromobility & Active', flags: { affects_parking: false, affects_emissions: false, affects_cost: false }, parking_factor_per_person: 0, isDefaultActive: true, defaultBaselineShare: 2 },
+  { key: 'TRANSIT', defaultName: 'Transit', defaultColor: '#a8842a', category: 'Transit', flags: { affects_parking: false, affects_emissions: true, affects_cost: true }, parking_factor_per_person: 0, isDefaultActive: true, defaultBaselineShare: 19 },
 ];
 
 function calculateTrips(population, modeShares, showRate) {
