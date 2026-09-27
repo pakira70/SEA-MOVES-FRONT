@@ -21,7 +21,6 @@ const formatCurrency = (value) => {
 function FinalCostDisplay({
     baselineCost,
     scenarioCost,
-    baselineShortfall,
     scenarioShortfall,
     isLoading,
     error,

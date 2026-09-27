@@ -1,6 +1,5 @@
 // src/App.jsx - REFACTORED FOR NEW API PAYLOAD
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import axios from 'axios';
 import { Routes, Route, NavLink } from 'react-router-dom';
 import {
   Container, Typography, Box, AppBar, Toolbar, Button,
@@ -9,7 +8,7 @@ import {
 
 import ScenarioPage from './pages/ScenarioPage.jsx';
 import ModelSetupPage from './pages/ModelSetupPage.jsx';
-import { API_BASE_URL, DEFAULT_PARKING_COST } from './config';
+import { AVAILABLE_MODES, calculateScenario } from './localCalculation.js';
 
 const theme = createTheme({
   palette: {
@@ -27,6 +26,7 @@ const FALLBACK_START_YEAR = 2024;
 const FALLBACK_NUM_YEARS = 5;
 const FALLBACK_POPULATION = 10000;
 const FALLBACK_PARKING_SUPPLY = 5000;
+const DEFAULT_PARKING_COST = 5000;
 
 function App() {
   const [modesLoading, setModesLoading] = useState(true);
@@ -105,89 +105,30 @@ function App() {
     return keysToSort;
   }, [activeModeDetails, baselineModeShares]);
 
-  // --- NEW UNIFIED API CALL FUNCTION ---
-  const fetchCalculations = useCallback(async (currentInputState, currentAppConfig, currentBaselineShares) => {
+  const runCalculations = useCallback((currentInputState, currentAppConfig, currentBaselineShares, currentModeDetails) => {
     if (Object.keys(currentBaselineShares).length === 0 || !currentAppConfig) return;
-    setIsLoading(true);
     setInteractiveError(null);
-
-    // --- Build BASELINE parameters ---
-    const baselinePopulation = Array(currentAppConfig.numYears).fill(currentAppConfig.quickStartPopulation);
-    if (currentAppConfig.quickAnnualGrowthRate !== 0) {
-      for (let i = 1; i < currentAppConfig.numYears; i++) {
-        baselinePopulation[i] = baselinePopulation[i-1] * (1 + currentAppConfig.quickAnnualGrowthRate / 100);
-      }
-    }
-    const baselineParking = Array(currentAppConfig.numYears).fill(currentAppConfig.quickStartParkingSupply);
-    const baselineInputParameters = {
-        modeShares: currentBaselineShares,
-        population_per_year: baselinePopulation,
-        parking_supply_per_year: baselineParking,
-        parking_cost_per_space: currentAppConfig.defaultParkingCost,
-        show_rate_percent: currentAppConfig.showRate,
-        num_years: currentAppConfig.numYears,
-    };
-
-    // --- Build SCENARIO parameters ---
-    const scenarioInputParameters = {
-        modeShares: currentInputState.modeShares,
-        population_per_year: currentInputState.populationValues,
-        parking_supply_per_year: currentInputState.parkingSupplyValues,
-        parking_cost_per_space: currentInputState.parkingCost,
-        show_rate_percent: currentAppConfig.showRate,
-        num_years: currentAppConfig.numYears,
-    };
-    
-    // --- Build SHUTTLE parameters ---
-    const shuttleParameters = {
-        includeShuttleCosts: currentAppConfig.includeShuttleCosts,
-        shuttleBaselineCost: currentAppConfig.shuttleBaselineCost,
-        shuttleParkingPercentage: currentAppConfig.shuttleParkingPercentage,
-        shuttleCostPerHour: currentAppConfig.shuttleCostPerHour,
-        shuttlePeakHours: currentAppConfig.shuttlePeakHours,
-        shuttleVehicleCapacity: currentAppConfig.shuttleVehicleCapacity,
-        shuttleMinContractHours: currentAppConfig.shuttleMinContractHours,
-        shuttleOperatingDays: currentAppConfig.shuttleOperatingDays,
-    };
-
-    const payload = {
-        baselineInputParameters,
-        scenarioInputParameters,
-        shuttleParameters,
-        modeCustomizations,
-    };
-
     try {
-        const response = await axios.post(`${API_BASE_URL}/calculate`, payload);
-        const { baselineResults, scenarioResults, shuttleResults } = response.data;
-
-        // Attach shuttle results to their respective data objects for easier prop passing
-        baselineResults.shuttle = {
-            annual_cost_per_year: shuttleResults.baseline_annual_cost_per_year,
-            total_shuttles_per_year: shuttleResults.baseline_shuttles_per_year
-        };
-        scenarioResults.shuttle = {
-            annual_cost_per_year: shuttleResults.scenario_annual_cost_per_year,
-            total_shuttles_per_year: shuttleResults.scenario_shuttles_per_year
-        };
-
+        const { baselineResults, scenarioResults } = calculateScenario({
+          inputState: currentInputState,
+          appConfig: currentAppConfig,
+          baselineModeShares: currentBaselineShares,
+          activeModeDetails: currentModeDetails,
+        });
         setBaselineApiResponseData(baselineResults);
         setApiResponseData(scenarioResults);
-
     } catch (err) {
-        setInteractiveError(err.response?.data?.error || err.message || "An unknown error occurred.");
-    } finally {
-        setIsLoading(false);
+        setInteractiveError(err.message || "An unknown error occurred.");
     }
-  }, [modeCustomizations]);
+    setIsLoading(false);
+  }, []);
 
 
   useEffect(() => {
-    const fetchInitialModes = async () => {
+    const loadInitialModes = () => {
       setModesLoading(true); setModesError(null);
       try {
-        const response = await axios.get(`${API_BASE_URL}/modes/available`);
-        const modesData = response.data;
+        const modesData = AVAILABLE_MODES;
         setAvailableModes(modesData);
         const iActiveSel = {}, iCustom = {}, iBaseShares = {};
         modesData.forEach(m => {
@@ -205,7 +146,7 @@ function App() {
           setModesLoading(false);
       }
     };
-    fetchInitialModes();
+    loadInitialModes();
   }, []);
 
   useEffect(() => {
@@ -217,16 +158,11 @@ function App() {
   // Effect to run calculations when core data is ready or changes
   useEffect(() => {
     if (!modesLoading && Object.keys(baselineModeShares).length > 0) {
-      fetchCalculations(inputState, appConfig, baselineModeShares);
+      runCalculations(inputState, appConfig, baselineModeShares, activeModeDetails);
     }
-  }, [modesLoading, inputState, appConfig, baselineModeShares, fetchCalculations]);
+  }, [modesLoading, inputState, appConfig, baselineModeShares, activeModeDetails, runCalculations]);
 
   // --- Handlers ---
-  const handleBaselineNumberInputChange = useCallback((event) => {
-      const { name, value } = event.target;
-      setIntermediateNumberInputs(prev => ({ ...prev, [name]: value }));
-  }, []);
-
   // Handler for custom number format component
   const handleBaselineFormattedNumberChange = useCallback((payload) => {
     const {name, value} = payload.target;

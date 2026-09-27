@@ -90,7 +90,7 @@ function ModeShareChart({ modeShares, activeModeDetails }) {
           // Only display label if the share is significant (e.g., > 1%)
           return context.dataset.data[context.dataIndex] > 1; 
         },
-        formatter: (value, context) => {
+        formatter: (value) => {
           // value is the raw data value for this segment
           // We want whole number + %
           return Math.round(value) + '%';

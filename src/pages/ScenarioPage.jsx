@@ -12,13 +12,6 @@ const getLastElement = (arr) => (!Array.isArray(arr) || arr.length === 0 ? undef
 const getElementAtIndex = (arr, index) => (!Array.isArray(arr) || index < 0 || index >= arr.length ? undefined : arr[index]);
 const sumArray = (arr) => (Array.isArray(arr) ? arr.reduce((sum, val) => sum + val, 0) : null);
 
-const modeDetailsShape = PropTypes.shape({
-    key: PropTypes.string.isRequired,
-    name: PropTypes.string.isRequired,
-    color: PropTypes.string.isRequired,
-    flags: PropTypes.object,
-});
-
 function ScenarioPage({
   inputState, apiResponseData, baselineApiResponseData, activeModeDetails,
   actualYears, sortedActiveModeKeys, isLoading, interactiveError,
